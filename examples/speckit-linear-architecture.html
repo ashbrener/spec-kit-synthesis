@@ -313,7 +313,7 @@
     </div>
     <div class="tier tier1"><div class="tier-in">
       <span class="tier-lab">Technical detail — the install discovery flow</span>
-      <p>The key is resolved in a fixed precedence — environment variable, then a gitignored <code>.env</code>, then an interactive no-echo prompt; in non-interactive mode the prompt is skipped and the install fails closed. It is then verified with a single identity query whose result is reused for both the operator stamp and the team listing (no second round-trip). Discovery walks a state machine: verify&nbsp;→&nbsp;team picker (auto-pick when one)&nbsp;→&nbsp;project picker (or create)&nbsp;→&nbsp;write config&nbsp;→&nbsp;only then register hooks. The binding is written <em>before</em> any hook step, so an interrupted install leaves nothing half-wired. A backwards-compatible non-interactive path accepts pre-resolved identifiers as flags for CI.</p>
+      <p>The key is resolved in a fixed precedence — environment variable, then a gitignored <code>.env</code>, then an interactive no-echo prompt; in non-interactive mode the prompt is skipped and the install fails closed. It is then verified with a single identity query, whose result is reused for the operator stamp (no duplicate identity call). Discovery then walks a state machine: verify&nbsp;→&nbsp;list teams&nbsp;→&nbsp;team picker (auto-pick when one)&nbsp;→&nbsp;list that team's projects&nbsp;→&nbsp;project picker (or create)&nbsp;→&nbsp;write config&nbsp;→&nbsp;only then register hooks. The binding is written <em>before</em> any hook step, so an interrupted install leaves nothing half-wired. A backwards-compatible non-interactive path accepts pre-resolved identifiers as flags for CI.</p>
     </div></div>
     <div class="tier tier2"><div class="tier-in"><div class="cites">
       <span class="cite-lab">Backed by</span>
@@ -477,7 +477,7 @@
     <p>A single committed file, <code>linear-config.yml</code>, binds the repository to its Linear destination. Because the file is committed, the repository is fully self-describing: clone it, run a sync, and it knows exactly where to write.</p>
     <div class="box decision">
       <span class="tag">Bind by identifier, never by name</span>
-      <p>Every Linear lookup uses an immutable identifier, never a display name. Names are editable in Linear's UI; a rename would silently break a name-based lookup. The only failure mode is deletion, which surfaces as an explicit error. The single secret — the API key — lives outside this file, gitignored, never committed.</p>
+      <p>Every Linear lookup uses an immutable identifier, never a display name. Names are editable in Linear's UI; a rename would silently break a name-based lookup. The only failure mode is deletion, which surfaces as an explicit error. Secrets live outside this committed file: the API key in a gitignored <code>.env</code> for local use, and a separate repository-secret token for the GitHub Action — neither is ever committed.</p>
     </div>
 
     <div class="tier tier1"><div class="tier-in">
@@ -493,7 +493,7 @@
           <tr><td>4</td><td>Red-team</td><td>red-team notes appear</td></tr>
           <tr><td>5</td><td>Implementing</td><td>implementation evidence on the branch</td></tr>
           <tr><td>6</td><td>Analyzing</td><td>analysis notes appear</td></tr>
-          <tr><td>7</td><td>Ready-to-merge</td><td>the PR is open &amp; ready</td></tr>
+          <tr><td>7</td><td>Ready-to-merge</td><td>the PR is opened or marked ready</td></tr>
           <tr><td>8</td><td>Merged</td><td>the PR has merged (no <code>phase:*</code> label)</td></tr>
         </tbody>
       </table></div>
@@ -700,18 +700,18 @@
     <span class="sec-no">10</span>
     <h2>Boundaries &amp; open questions</h2>
     <p class="section-sub">What the system deliberately does not do — and the questions its own specs leave open.</p>
-    <p>Out of scope by design: <strong>two-way sync</strong> (one-way only; Linear is read solely to detect drift), <strong>pull-request mutation</strong>, and <strong>deleting issues</strong> (only create and update; a checklist ticked in Linear is rewritten on the next reconcile, and a banner says so). The following are genuinely <strong>unresolved</strong> in the specs — recorded, unanswered, rather than guessed at.</p>
+    <p>Out of scope by design: <strong>no reverse-sync</strong> (the flow is one-way — Linear is read to look issues up and to detect drift, but never to update your files), <strong>no pull-request mutation</strong>, and <strong>no destructive deletes</strong> (the bridge creates and updates issues; the one removal it performs is archiving a duplicate Issue from a rare race; a checklist ticked in Linear is rewritten on the next reconcile, and a banner says so). The following are genuinely <strong>unresolved</strong> in the specs — recorded, unanswered, rather than guessed at.</p>
     <div class="box unspec">
       <span class="tag">Known gap — merged features on a deleted branch</span>
       <p>When a feature's PR has merged and its branch is deleted, the bridge can struggle to <em>detect</em> the merge from a different worktree, leaving the feature at an earlier phase. Writing from any branch lets the correct state be written, but reliably <em>inferring</em> "merged" without a live branch reference is flagged as a separate hardening still to be done.</p>
     </div>
     <div class="box unspec">
       <span class="tag">Unspecified — orphaned phase sub-issues</span>
-      <p>If an entire implementation phase is removed from <code>tasks.md</code>, what becomes of the sub-issue it created is not specified. Consistent with the no-deletes stance it would be left in place; explicit cleanup is undefined.</p>
+      <p>If an entire implementation phase is removed from <code>tasks.md</code>, what becomes of the sub-issue it created is not specified at all — neither cleanup nor retention is defined. The specs leave this open.</p>
     </div>
     <div class="box unspec">
       <span class="tag">Unspecified — API limits &amp; large content</span>
-      <p>Linear's rate limits and any ceiling on description size are acknowledged but have no defined handling strategy yet; the team/project pickers show only the first page — pagination of long lists is explicitly deferred.</p>
+      <p>The bridge's defence against partial failure is general re-runnability — an interrupted sync converges on the next run rather than handling Linear's rate limits specifically. Any ceiling on Linear description size is unspecified. And the team/project pickers show only the first page — pagination of long lists is explicitly deferred.</p>
     </div>
     <div class="tier tier2"><div class="tier-in"><div class="cites">
       <span class="cite-lab">Backed by</span>
@@ -725,10 +725,14 @@
     <span class="sec-no">11</span>
     <h2>Where this is headed</h2>
     <p class="section-sub">The one forward-looking idea that is structural rather than speculative.</p>
-    <p>The reconcile engine and the filesystem-to-tracker data model at the heart of this system were the proving ground for something larger: a <strong>vendor-neutral interchange format</strong> for "work items with lifecycle." The same hardened engine — idempotent, fail-closed, drift-aware — and the same interpretation of a repository's specs are designed to be lifted out and reused, so other destinations (a different tracker, or a synthesized architecture document) can consume the same shape. Linear is simply the first sink proven against that model; the architecture is built so it need not be the last.</p>
+    <p>One forward-looking idea is structural rather than speculative. The system already keeps a deliberate separation between the half that reads the repository and the half that talks to Linear, with a tool-agnostic model of "the work" in between. That seam is what makes a second destination — a different tracker, or a synthesized architecture document — a matter of adding a writer against the same internal model, rather than a rewrite. Linear is simply the first destination proven against it; the structure is built so it need not be the last.</p>
+    <div class="box unspec">
+      <span class="tag">Unspecified — the broader roadmap</span>
+      <p>The "lift the engine out into a shared, vendor-neutral format" ambition lives in the project's wider planning, not in these feature specs. What the specs themselves support is the narrower, verifiable claim above: a clean internal seam that a future destination could reuse.</p>
+    </div>
     <div class="tier tier2"><div class="tier-in"><div class="cites">
       <span class="cite-lab">Backed by</span>
-      <span class="cite" data-t="spec" title="001-spec-kit-linear-bridge / plan.md · Structure Decision (tool-agnostic intermediate); research.md · Decision 1 rationale">001 · plan.md · tool-agnostic core</span>
+      <span class="cite" data-t="spec" title="001-spec-kit-linear-bridge / plan.md · Structure Decision &amp; Summary (parser → internal model → linear-writer separation; tool-agnostic intermediate)">001 · plan.md · structure decision</span>
     </div></div></div>
   </section>
 
@@ -818,7 +822,7 @@
       ["Specifying","spec.md exists, no plan yet"],["Clarifying","a clarifications session appears in spec.md"],
       ["Planning","plan.md appears"],["Tasking","tasks.md appears"],
       ["Red-team","red-team notes appear"],["Implementing","implementation evidence on the branch"],
-      ["Analyzing","analysis notes appear"],["Ready-to-merge","the PR is open & ready"],
+      ["Analyzing","analysis notes appear"],["Ready-to-merge","the PR is opened or marked ready"],
       ["Merged","the PR has merged"]
     ];
     var cap = document.getElementById("cap-3"), base = cap.innerHTML;
