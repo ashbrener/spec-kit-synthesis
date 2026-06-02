@@ -1,6 +1,8 @@
 # DESIGN — spec-kit-synthesis
 
-**Status:** design pass, awaiting review. **No generator code until this is agreed.**
+**Status:** design agreed; **Phase 1 built, proven faithful, and merged** (the
+spec-kit→storybook engine — see `examples/generated/RESULT.md` and `README.md`).
+Phase 2 (code as a second source / coverage view) is next per §11.4.
 
 This document is written *backward from a target*. Before reading it, read the
 target: [`examples/speckit-linear-architecture.html`](examples/speckit-linear-architecture.html)
