@@ -260,6 +260,20 @@ def build_css(theme: dict[str, str]) -> str:
   .cite[data-t="doc"]::before  {{ content: "doc";  background: var(--plum); }}
   .cite[data-t="doc"]:hover  {{ border-color: var(--plum); }}
 
+  /* coverage matrix (intent vs reality) */
+  .coverage {{ border: 1px solid var(--hair-2); border-radius: 12px; overflow: hidden; margin: 22px 0; }}
+  .cov-head, .cov-row {{ display: grid; grid-template-columns: 1.4fr .9fr 2fr; gap: 14px; padding: 12px 16px; align-items: start; }}
+  .cov-head {{ font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); background: var(--paper-2); }}
+  .cov-row {{ border-top: 1px solid var(--hair-2); }}
+  .cov-area {{ font-family: var(--sans); font-weight: 600; font-size: 14.5px; }}
+  .cov-note {{ font-weight: 400; font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }}
+  .cov-srcs {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+  .cov-pill {{ font-family: var(--mono); font-size: 10.5px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }}
+  .cov-spec_backed {{ background: color-mix(in srgb, var(--teal) 18%, transparent); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 40%, transparent); }}
+  .cov-specced_only {{ background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 38%, transparent); }}
+  .cov-implemented_only {{ background: color-mix(in srgb, var(--plum) 16%, transparent); color: var(--plum); border-color: color-mix(in srgb, var(--plum) 38%, transparent); }}
+  .cov-unknown {{ background: var(--paper-2); color: var(--ink-3); border-color: var(--hair-2); }}
+
   .box {{ border-radius: 13px; padding: 18px 20px; margin: 24px 0; font-family: var(--sans); font-size: 15.5px; line-height: 1.55; border: 1px solid; position: relative; max-width: 70ch; }}
   .box .tag {{ font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 7px; }}
   .box p {{ margin: 0; max-width: none; font-family: var(--sans); }}
@@ -548,7 +562,43 @@ def _render_block_core(block: Block, fig_counter: list[int]) -> str:
             '<span class="pin">Hover the nodes to explore.</span></figcaption>'
             "</div></figure>"
         )
+    if block.type is BlockType.COVERAGE:
+        return _render_coverage(block.coverage or [])
     return ""
+
+
+_COVERAGE_LABEL = {
+    "spec_backed": "Specified &amp; built",
+    # specced_only means "no implementing code was found in the SCANNED tree" —
+    # which honestly covers both genuinely-unbuilt areas and code that lives
+    # outside the scan (e.g. installed templates). The row's note disambiguates.
+    "specced_only": "Specified, not in scanned source",
+    "implemented_only": "Built, not specified",
+    "unknown": "Unknown",
+}
+
+
+def _render_coverage(rows: list) -> str:
+    """An intent-vs-reality matrix: one row per area, a status pill, and the
+    spec/code citation chips that back the classification (DESIGN §5.8)."""
+    out = ['<div class="coverage">']
+    out.append('<div class="cov-head"><span>Area</span><span>Coverage</span><span>Sources</span></div>')
+    for ci in rows:
+        status = ci.status.value if hasattr(ci.status, "value") else str(ci.status)
+        chips = "".join(
+            f'<span class="cite" data-t="{r.type.value}">{esc(r.name)}</span>'
+            for r in (list(ci.spec_refs) + list(ci.code_refs))
+        )
+        note = f'<div class="cov-note">{esc(ci.note)}</div>' if ci.note else ""
+        out.append(
+            '<div class="cov-row">'
+            f'<div class="cov-area">{esc(ci.area)}{note}</div>'
+            f'<div><span class="cov-pill cov-{status}">{_COVERAGE_LABEL.get(status, esc(status))}</span></div>'
+            f'<div class="cov-srcs">{chips}</div>'
+            "</div>"
+        )
+    out.append("</div>")
+    return "".join(out)
 
 
 def _render_block(block: Block, fig_counter: list[int]) -> str:
