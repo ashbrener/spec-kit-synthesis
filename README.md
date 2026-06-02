@@ -89,6 +89,34 @@ examples/                   the north-star target + a generated result
 DESIGN.md                   the full design rationale (read §11 for the resolved architecture)
 ```
 
+## Continuous integration
+
+CI (GitHub Actions, `.github/workflows/ci.yml`) runs the test suite on
+Python 3.11 and 3.12 for every push and pull request. The convention is to
+**run the exact CI command locally before pushing**:
+
+```bash
+uv run pytest skill/tests -q
+```
+
+That is the same command CI runs (after `uv sync --dev`). If it passes
+locally, it passes in CI.
+
+## Usage at a glance
+
+```bash
+# Specs only → architecture storybook:
+uv run python skill/scripts/synthesize.py path/to/specs --work .synthesis \
+    --project-name "My System"
+#   … the in-session agent reasons the IR (it cites only .synthesis/locators.txt) …
+uv run python skill/scripts/synthesize.py path/to/specs --work .synthesis \
+    --out architecture.html
+
+# Specs + code → adds the coverage view (specified vs built):
+uv run python skill/scripts/synthesize.py path/to/specs --code path/to/src \
+    --work .synthesis --out architecture.html
+```
+
 ## Status
 
 **Phases 1 and 2 complete and proven**, each judged faithful (0/0/0) by an
