@@ -416,8 +416,27 @@ Faithfulness is enforced at every phase, not bolted on at the end.
 
 ## 6. Pipeline & engine (how it's built)
 
-- **Engine:** the LLM is the product, not a helper. Phases A–D are LLM calls
-  with structured (schema-constrained) outputs; render is pure code.
+- **Delivery: a SKILL, not a program that shells out to an LLM.** The tool ships
+  as an installable skill (like spec-kit / graphify), and **the in-session Claude
+  Code agent IS the reasoning engine** — there is no `claude -p` subprocess, no
+  API key, no provider question. A `SKILL.md` carries the orchestration algorithm
+  the agent follows; deterministic `scripts/` (run via `uv`, **no LLM inside**)
+  carry the parsing, the fail-closed faithfulness gate, and the renderer. This is
+  the ecosystem-native shape: the agent reasons in-session, and at scale the
+  extract *map* fans out to sub-agents (harness-native map-reduce) rather than a
+  Python async loop. Rationale: it makes "AI is the engine" literal rather than
+  bolted-on, removes the auth/provider question entirely, and matches every other
+  tool in the family. The Phase descriptions in §3 are the agent's algorithm; the
+  guardrails below are code the agent MUST run.
+- **The split that keeps it faithful:** *reasoning* lives in the agent + SKILL.md
+  (extract / reconcile / compose); *guarantees* live in deterministic scripts.
+  In particular the **Phase-D verify gate is a script that fails closed** — it
+  rejects any composed block whose claims lack a resolvable `source_ref`,
+  regardless of what the model produced. Faithfulness is therefore code-enforced,
+  not model-promised. Render is pure code (golden-tested against `examples/`).
+- **Engine:** the LLM (the in-session agent) is the product, not a helper.
+  Phases A–C are the agent's reasoning with structured (schema-constrained)
+  outputs persisted as IR artifacts; Phase D and render are deterministic code.
 - **Clean adapter / core seam (a v1 design constraint, for a future option).**
   The valuable, hard part — extract → reconcile → compose → verify, with
   faithfulness and provenance — has nothing intrinsically to do with spec-kit; it

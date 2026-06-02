@@ -1,0 +1,209 @@
+{
+  "schema_version": "0.1.0",
+  "title": "Spec-Kit → Linear Bridge",
+  "lede": "Your repository's spec-kit feature folders, mirrored into Linear as living, trackable issues — automatically, one way, and never by hand.",
+  "sections": [
+    {
+      "id": "what",
+      "number": 1,
+      "title": "What this system is",
+      "subtitle": "The one-paragraph version, then the why.",
+      "blocks": [
+        {
+          "type": "prose",
+          "altitude": "functional",
+          "prose": "This system is a spec-kit extension: install it into a repository, and every feature folder is reflected into Linear — one Project per repository, one Issue per feature, one sub-issue per implementation phase — and it keeps that reflection current automatically as you work.",
+          "claim_ids": ["c-overview"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · spec.md · Overview", "locator": "spec-001#overview", "anchor": "Overview, FR-001"},
+            {"type": "spec", "name": "constitution · Principles I–II", "locator": "spec-const#p1", "anchor": "Filesystem is the single source of truth"}
+          ]
+        },
+        {
+          "type": "callout",
+          "altitude": "functional",
+          "callout_kind": "decision",
+          "callout_tag": "Core idea",
+          "prose": "The filesystem is the single source of truth for planned work; Linear is a faithful projection of it. The bridge converges that projection to the files on every run — idempotently and without silently destroying information.",
+          "claim_ids": ["c-overview"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · spec.md · Overview", "locator": "spec-001#overview"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bigpicture",
+      "number": 2,
+      "title": "Architecture at a glance",
+      "subtitle": "A reconcile engine over the filesystem, writing into Linear.",
+      "blocks": [
+        {
+          "type": "prose",
+          "altitude": "functional",
+          "prose": "The reconciler reads the repository, computes what Linear should contain, and makes it so. It is what every local trigger runs.",
+          "claim_ids": ["c-layers"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · plan.md · two layers", "locator": "spec-001#plan"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "functional",
+          "diagram": {
+            "layout": "pipeline",
+            "nodes": [
+              {"id": "repo", "label": "repository", "caption": "The repository is the single source of truth: feature folders plus the committed binding config.", "target": "datamodel", "source_refs": [{"type": "spec", "name": "001 · spec.md", "locator": "spec-001"}]},
+              {"id": "read", "label": "read", "caption": "Layer D reads every feature folder from disk.", "source_refs": [{"type": "code", "name": "src/reconcile.sh", "locator": "code-reconcile"}]},
+              {"id": "infer", "label": "infer", "caption": "Infer each feature's lifecycle phase from what exists on disk."},
+              {"id": "write", "label": "write", "caption": "Write the desired state into Linear, idempotently.", "target": "datamodel"},
+              {"id": "linear", "label": "Linear", "caption": "One Project per repo, one Issue per feature, sub-issues per phase."}
+            ],
+            "edges": [
+              {"src": "repo", "dst": "read", "label": "trigger"},
+              {"src": "read", "dst": "infer"},
+              {"src": "infer", "dst": "write"},
+              {"src": "write", "dst": "linear", "label": "create / update", "emphasis": true}
+            ]
+          },
+          "claim_ids": ["c-layers"],
+          "source_refs": [
+            {"type": "code", "name": "src/reconcile.sh", "locator": "code-reconcile", "anchor": "the single reconcile entry point"}
+          ]
+        },
+        {
+          "type": "prose",
+          "altitude": "technical",
+          "prose": "State lives in exactly three inspectable places: the repository's filesystem, Linear itself, and the GitHub Action's per-run environment. There is no database, no daemon, and no local \"last-seen\" cache — the reconciler recomputes everything from the filesystem each run.",
+          "claim_ids": ["c-state"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · research.md · §15 state", "locator": "spec-001#research", "anchor": "Decision 15"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "datamodel",
+      "number": 3,
+      "title": "The data model",
+      "subtitle": "How a feature folder maps onto Linear, and the lifecycle ladder it climbs.",
+      "blocks": [
+        {
+          "type": "prose",
+          "altitude": "functional",
+          "prose": "A repository becomes a Project; each feature spec becomes an Issue inside it; each implementation phase becomes a sub-issue; the tasks within a phase become a read-only checklist.",
+          "claim_ids": ["c-mapping"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · spec.md · mapping table", "locator": "spec-001#mapping"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "functional",
+          "diagram": {
+            "layout": "ladder",
+            "nodes": [
+              {"id": "p0", "label": "Specifying", "caption": "Rank 0 — spec.md exists, no plan yet."},
+              {"id": "p1", "label": "Planning", "caption": "Rank 1 — plan.md appears."},
+              {"id": "p2", "label": "Tasking", "caption": "Rank 2 — tasks.md appears."},
+              {"id": "p3", "label": "Implementing", "caption": "Rank 3 — implementation evidence on the branch."},
+              {"id": "p4", "label": "Merged", "caption": "Rank 4 — the PR has merged; no phase label.", "target": "what"}
+            ],
+            "edges": []
+          },
+          "claim_ids": ["c-ladder"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · data-model.md · 9-phase lifecycle", "locator": "spec-001#datamodel", "anchor": "§6.1 lifecycle state machine"}
+          ]
+        },
+        {
+          "type": "table",
+          "altitude": "technical",
+          "table": [
+            ["Rank", "Phase", "Advanced when…"],
+            ["0", "Specifying", "spec.md exists, no plan.md yet"],
+            ["1", "Planning", "plan.md appears"],
+            ["2", "Tasking", "tasks.md appears"],
+            ["3", "Implementing", "implementation evidence on the branch"],
+            ["4", "Merged", "the PR has merged (no phase label)"]
+          ],
+          "claim_ids": ["c-ladder"],
+          "source_refs": [
+            {"type": "spec", "name": "001 · contracts/config-schema.json", "locator": "spec-001#contract", "anchor": "UUID-keyed workflow states"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "authority",
+      "number": 4,
+      "title": "Authority & safety model",
+      "subtitle": "Who wins when the repository and Linear disagree.",
+      "blocks": [
+        {
+          "type": "prose",
+          "altitude": "functional",
+          "prose": "The governing principle is that the filesystem is the authority. When the repository and a Linear issue disagree, the repository wins — but the bridge will not regress Linear blindly.",
+          "claim_ids": ["c-authority"],
+          "source_refs": [
+            {"type": "spec", "name": "003 · spec.md · FR-051–057", "locator": "spec-003#fr", "anchor": "drift-aware write authority"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "functional",
+          "diagram": {
+            "layout": "flow",
+            "nodes": [
+              {"id": "start", "label": "before writing a feature", "caption": "Every write path begins here."},
+              {"id": "check", "label": "is Linear ahead of the repo?", "caption": "The drift check decides whether Linear ranks higher than disk."},
+              {"id": "write", "label": "write silently", "caption": "No drift — forward / equal movement writes idempotently."},
+              {"id": "warn", "label": "surface a structured warning", "caption": "Backward-drift — surface it; let the operator decide."}
+            ],
+            "edges": [
+              {"src": "start", "dst": "check"},
+              {"src": "check", "dst": "write", "label": "no · forward"},
+              {"src": "check", "dst": "warn", "label": "yes · drift", "emphasis": true}
+            ]
+          },
+          "claim_ids": ["c-authority"],
+          "source_refs": [
+            {"type": "code", "name": "src/reconcile.sh · compute_drift", "locator": "code-reconcile-drift"}
+          ]
+        },
+        {
+          "type": "callout",
+          "altitude": "functional",
+          "callout_kind": "evolution",
+          "callout_tag": "Evolution — write authority was redefined",
+          "prose": "The original rule was a hard gate tied to git branches: only a worktree on a feature's own branch could write it. It was superseded by the drift-aware model: any worktree may write, and the bridge detects and surfaces a backward move rather than forbidding it.",
+          "claim_ids": ["c-evolution"],
+          "source_refs": [
+            {"type": "spec", "name": "003 · spec.md · evolution", "locator": "spec-003#evolution", "anchor": "Principle IV redefinition"}
+          ]
+        },
+        {
+          "type": "callout",
+          "altitude": "functional",
+          "callout_kind": "unspecified",
+          "callout_tag": "Unspecified — orphaned phase sub-issues",
+          "prose": "If an entire implementation phase is removed from tasks.md, what becomes of the sub-issue it created is not specified at all — neither cleanup nor retention is defined.",
+          "claim_ids": ["c-gap"],
+          "source_refs": [
+            {"type": "spec", "name": "003 · research.md · §3 gap", "locator": "spec-003#gap"}
+          ]
+        },
+        {
+          "type": "prose",
+          "altitude": "technical",
+          "prose": "Backward-drift fires when Linear's recorded phase rank strictly exceeds the disk-inferred rank — clock-independent. A corroborating recency signal uses the feature folder's last git-commit time, never file mtime, with a small clock-skew tolerance.",
+          "claim_ids": ["c-drift-signals"],
+          "source_refs": [
+            {"type": "spec", "name": "003 · research.md · §1–2", "locator": "spec-003#research"},
+            {"type": "code", "name": "src/git_helpers.sh · spec_dir_last_commit", "locator": "code-git-helpers"}
+          ]
+        }
+      ]
+    }
+  ]
+}
