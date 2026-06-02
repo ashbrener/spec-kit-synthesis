@@ -33,6 +33,7 @@ from schema import (
 from verify import (
     CHECK_BLOCK_CLAIMS_EXIST,
     CHECK_BLOCK_SOURCE_REFS,
+    CHECK_CALLOUT_BODY,
     CHECK_COVERAGE_NOTE,
     CHECK_NON_EMPTY_GROUNDING,
     CHECK_PROVENANCE_RESOLVES,
@@ -221,6 +222,7 @@ def test_verify_callout_and_diagram_exempt_from_grounding():
         altitude=Altitude.FUNCTIONAL,
         callout_kind=CalloutKind.UNSPECIFIED,
         callout_tag="Unspecified",
+        prose="This area is left open by the specs.",
         claim_ids=[],
     )
     diagram = Block(
@@ -237,6 +239,30 @@ def test_verify_callout_and_diagram_exempt_from_grounding():
     )
     vs = verify(_doc([callout, diagram, grounded]), _arch(), _corpus())
     assert not any(v.check == CHECK_NON_EMPTY_GROUNDING for v in vs)
+
+
+def test_verify_empty_callout_body_fails_check_6():
+    # A callout with a tag but no body renders as an empty box — must be caught.
+    empty = Block(
+        type=BlockType.CALLOUT,
+        altitude=Altitude.FUNCTIONAL,
+        callout_kind=CalloutKind.EVOLUTION,
+        callout_tag="Evolution — something changed",
+        claim_ids=[],
+    )
+    vs = verify(_doc([empty]), _arch(), _corpus())
+    assert any(v.check == CHECK_CALLOUT_BODY for v in vs)
+    # and a callout WITH a body does not trip it
+    full = Block(
+        type=BlockType.CALLOUT,
+        altitude=Altitude.FUNCTIONAL,
+        callout_kind=CalloutKind.EVOLUTION,
+        callout_tag="Evolution — something changed",
+        prose="It used to do A; now it does B.",
+        claim_ids=[],
+    )
+    vs2 = verify(_doc([full]), _arch(), _corpus())
+    assert not any(v.check == CHECK_CALLOUT_BODY for v in vs2)
 
 
 def test_verify_open_question_claim_id_resolves():
