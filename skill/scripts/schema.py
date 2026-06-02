@@ -237,6 +237,7 @@ class BlockType(str, Enum):
     TABLE = "table"
     CALLOUT = "callout"
     DIAGRAM = "diagram"
+    COVERAGE = "coverage"   # intent-vs-reality matrix (Phase 2; carries CoverageItem rows)
 
 
 class CalloutKind(str, Enum):
@@ -286,6 +287,7 @@ class Block(BaseModel):
     callout_kind: Optional[CalloutKind] = None
     callout_tag: Optional[str] = None
     diagram: Optional[DiagramGraph] = None
+    coverage: Optional[list["CoverageItem"]] = Field(default=None, description="Coverage rows for a COVERAGE block (Phase 2).")
     claim_ids: list[str] = Field(default_factory=list, description="Claims this block rests on; the verify gate resolves them.")
     source_refs: list[SourceRef] = Field(default_factory=list, description="Resolved citations for the Layer-2 drill-down.")
 
@@ -296,6 +298,7 @@ class Block(BaseModel):
             BlockType.TABLE: self.table is not None,
             BlockType.CALLOUT: self.callout_kind is not None,
             BlockType.DIAGRAM: self.diagram is not None,
+            BlockType.COVERAGE: bool(self.coverage),
         }
         if not present[self.type]:
             raise ValueError(f"Block of type {self.type} is missing its payload.")
