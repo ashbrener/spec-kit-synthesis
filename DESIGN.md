@@ -314,6 +314,17 @@ LLMs aren't bit-deterministic; we engineer *structural* stability instead:
 Accept that exact wording drifts run-to-run; guarantee that structure, claims,
 and provenance are stable.
 
+> **What "persisted" means here — a build artifact, not a product-of-record.**
+> The architecture model and the content-hash cache are a **compiler IR + speed
+> cache**: written to disk so a run is reviewable and incremental, but
+> **regenerated from the sources on every run, never authoritative, never
+> hand-edited.** They are intermediate output of a stateless compile (§11.2 #4),
+> not a persistent product model. Delete them and the next run recreates them
+> identically from the specs. This is categorically distinct from product-mem's
+> accumulating product graph — synthesis holds no state of record, only the
+> current run's derivation. If a fact is wrong, you fix the *source* and
+> recompile; you never edit the model or the storybook.
+
 ---
 
 ## 4. Input: raw specs primary, workstate as a structural overlay
@@ -505,6 +516,11 @@ Faithfulness is enforced at every phase, not bolted on at the end.
 - **Stack:** Python 3.11+, stdlib-first, minimal deps (HTTP client for the LLM
   API, the shared workstate validator when overlay is used). Self-contained HTML
   (no external assets) so the artifact is portable.
+- **Toolchain: `uv`, not `pip`** — matches the ecosystem house standard
+  (`workstate-schema`, the trackers). Dependencies, virtualenvs, and runs go
+  through `uv`; never invoke `pip` directly or touch system Python. End users who
+  only run the tool should not need to know `uv` is underneath (mirror the
+  ecosystem's wrapper convention).
 
 ---
 
@@ -703,12 +719,19 @@ it is this seam.
 3. **Generated, never authored.** The storybook is the canonical *read* surface,
    never a hand-editable write source of truth. Wrong claim → fix the source,
    regenerate. (§0)
-4. **Reconcile is the product.** Engineering care, eval budget, and cross-model
+4. **Stateless by construction.** Every run is a pure function of its inputs
+   (specs [+ optional workstate overlay] + theme) → HTML. The tool never
+   maintains a persistent, authoritative product model — that is product-mem's
+   territory, reached only via the `workstate` format. This is the boundary that
+   keeps synthesis from disturbing a peer product graph: synthesis *renders*, it
+   does not *accumulate state*. (See the build-artifact clarification in §3 —
+   the architecture model and cache are per-run, never a product-of-record.)
+5. **Reconcile is the product.** Engineering care, eval budget, and cross-model
    review concentrate on the reduce phase — current-state correctness,
    supersessions collapsed, contradictions surfaced. (§3, §10)
-5. **Coverage honesty.** The doc always frames its own scope; it never implies
+6. **Coverage honesty.** The doc always frames its own scope; it never implies
    more coverage than its sources support. (§5.8)
-6. **Composition ≠ markup ≠ theme.** LLM emits a document model (incl. declarative
+7. **Composition ≠ markup ≠ theme.** LLM emits a document model (incl. declarative
    diagram graphs); a deterministic renderer makes interactive SVG HTML; a theme
    is cosmetic data applied at render. Three clean stages. (§6)
 
