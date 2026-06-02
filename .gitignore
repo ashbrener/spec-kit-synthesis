@@ -6,3 +6,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# per-run build artifacts (stateless; regenerated each run — DESIGN §11.2 #4)
+.synthesis/
