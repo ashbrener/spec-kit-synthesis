@@ -91,11 +91,20 @@ DESIGN.md                   the full design rationale (read §11 for the resolve
 
 ## Status
 
-**Phase 1 complete and proven.** The full pipeline ran on a real three-feature
-project and an independent cross-model review judged the output faithful (see
-`examples/generated/RESULT.md`). The synthesis is the part that's proven; a
-push-button one-command UX and additional source adapters (e.g. code, for a
-coverage view) are sequenced next — see `DESIGN.md` §11.4.
+**Phases 1 and 2 complete and proven**, each judged faithful (0/0/0) by an
+independent cross-model review (`examples/generated/`):
+
+- **Phase 1 — the synthesis engine.** spec-kit specs → one current-state
+  storybook; supersessions collapsed to evolution notes; gaps surfaced as
+  "Unspecified". (`speckit-linear-architecture.generated.html` + `RESULT.md`.)
+- **Phase 2 — code as a second source / the coverage view.** A code adapter
+  feeds the *same* source-agnostic core (the seam held — zero core changes), so
+  the storybook can cross-check the specified architecture against the actual
+  code and show, per area, what is specified-and-built vs specified-but-not-in-
+  the-scanned-source. (`speckit-linear-coverage.generated.html`.)
+
+Sequenced next (DESIGN §11.4): a push-button one-command UX; further source
+adapters (design-doc/ADR); host-theme detection.
 
 Themeable per host project; stateless by construction (every run is a pure
 function of its inputs — no persistent product model). See `DESIGN.md` for the

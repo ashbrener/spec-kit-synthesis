@@ -166,6 +166,48 @@ class EvolutionNote(BaseModel):
     source_refs: list[SourceRef] = Field(..., min_length=1)
 
 
+class CoverageStatus(str, Enum):
+    """How well an area of the system is backed by spec AND by code (DESIGN §5.8).
+
+    The coverage view's whole point is honesty about a half-specced system:
+    naming what is specified-but-unbuilt and built-but-unspecified, rather than
+    letting a specs-only doc read as complete.
+    """
+
+    SPEC_BACKED = "spec_backed"        # specified AND present in code
+    SPECCED_ONLY = "specced_only"      # specified but no code found — specced-but-unbuilt
+    IMPLEMENTED_ONLY = "implemented_only"  # code exists but no spec — built-but-unspecced
+    UNKNOWN = "unknown"                # cannot determine from the sources at hand
+
+
+class CoverageItem(BaseModel):
+    """One area of the system, classified by intent-vs-reality (DESIGN §5.8 'better').
+
+    Produced only when a code source is present (Phase 2). spec_refs cite the
+    specifying fragments; code_refs cite the implementing fragments. The verify
+    gate resolves both against the corpus, so a coverage claim is as grounded as
+    any other.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    area: str = Field(..., description="The component/feature this row is about (display name).")
+    status: CoverageStatus
+    note: Optional[str] = Field(None, description="One-line justification; required for implemented_only/unknown.")
+    spec_refs: list[SourceRef] = Field(default_factory=list, description="Specifying sources (type=spec/design_doc).")
+    code_refs: list[SourceRef] = Field(default_factory=list, description="Implementing sources (type=code).")
+
+    @model_validator(mode="after")
+    def _refs_match_status(self) -> "CoverageItem":
+        if self.status is CoverageStatus.SPEC_BACKED and not (self.spec_refs and self.code_refs):
+            raise ValueError(f"CoverageItem {self.area!r} is spec_backed but lacks both spec_refs and code_refs.")
+        if self.status is CoverageStatus.SPECCED_ONLY and not self.spec_refs:
+            raise ValueError(f"CoverageItem {self.area!r} is specced_only but has no spec_refs.")
+        if self.status is CoverageStatus.IMPLEMENTED_ONLY and not self.code_refs:
+            raise ValueError(f"CoverageItem {self.area!r} is implemented_only but has no code_refs.")
+        return self
+
+
 class ArchitectureModel(BaseModel):
     """The reconciled, current-state model — the core's reduce output (Phase B).
 
@@ -185,6 +227,7 @@ class ArchitectureModel(BaseModel):
     open_questions: list[Claim] = Field(default_factory=list, description="Unresolved/contradictory → 'Unspecified' (DESIGN §5.2/§5.3).")
     section_plan: list[str] = Field(default_factory=list, description="Ordered section ids assigned by reconcile (DESIGN §2 spine + inferred slots).")
     coverage_note: Optional[str] = Field(None, description="Mandatory scope framing (DESIGN §5.8 coverage honesty).")
+    coverage: list[CoverageItem] = Field(default_factory=list, description="Intent-vs-reality coverage rows; empty in specs-only (Phase 1) runs, populated when a code source is present (Phase 2).")
 
 
 # ───────────────────────── compose output (the document) ───────────────────
@@ -194,6 +237,7 @@ class BlockType(str, Enum):
     TABLE = "table"
     CALLOUT = "callout"
     DIAGRAM = "diagram"
+    COVERAGE = "coverage"   # intent-vs-reality matrix (Phase 2; carries CoverageItem rows)
 
 
 class CalloutKind(str, Enum):
@@ -243,6 +287,7 @@ class Block(BaseModel):
     callout_kind: Optional[CalloutKind] = None
     callout_tag: Optional[str] = None
     diagram: Optional[DiagramGraph] = None
+    coverage: Optional[list["CoverageItem"]] = Field(default=None, description="Coverage rows for a COVERAGE block (Phase 2).")
     claim_ids: list[str] = Field(default_factory=list, description="Claims this block rests on; the verify gate resolves them.")
     source_refs: list[SourceRef] = Field(default_factory=list, description="Resolved citations for the Layer-2 drill-down.")
 
@@ -253,6 +298,7 @@ class Block(BaseModel):
             BlockType.TABLE: self.table is not None,
             BlockType.CALLOUT: self.callout_kind is not None,
             BlockType.DIAGRAM: self.diagram is not None,
+            BlockType.COVERAGE: bool(self.coverage),
         }
         if not present[self.type]:
             raise ValueError(f"Block of type {self.type} is missing its payload.")
@@ -286,7 +332,7 @@ __all__ = [
     "SourceType", "SourceRef",
     "Fragment", "FragmentCorpus",
     "Altitude", "Claim", "Decision", "SpecDigest",
-    "EvolutionNote", "ArchitectureModel",
+    "EvolutionNote", "CoverageStatus", "CoverageItem", "ArchitectureModel",
     "BlockType", "CalloutKind",
     "DiagramNode", "DiagramEdge", "DiagramGraph",
     "Block", "Section", "DocumentModel",
