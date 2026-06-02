@@ -28,12 +28,15 @@ files are present it verifies and renders; otherwise it stops with the brief.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
+import adapter_code
 import adapter_speckit
 import render as render_mod
 import verify as verify_mod
+from schema import FragmentCorpus
 
 HAND_OFF = """\
 ─────────────────────────────────────────────────────────────────────────────
@@ -51,16 +54,27 @@ HAND_OFF = """\
    2. {doc}
       compose the ArchitectureModel into a DocumentModel: altitude-tagged
       blocks (functional Layer 0 / technical Layer 1), callouts with bodies,
-      declarative diagram graphs, citations carried as source_refs.
+      declarative diagram graphs, citations carried as source_refs.{coverage_hint}
+
+ A flat list of every valid locator (the ONLY ids you may cite) is written to:
+   {locators}
 
  THEN re-run this same command with --out to verify (fail-closed) and render.
 ─────────────────────────────────────────────────────────────────────────────
 """
 
+_COVERAGE_HINT = """
+
+   Because a code source was merged in, ALSO add a coverage[] to the
+   ArchitectureModel and a COVERAGE block: classify each area spec_backed /
+   specced_only / implemented_only, citing real spec AND code locators. Do not
+   omit a built area (every scanned code file should be represented)."""
+
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Drive the spec-kit-synthesis pipeline (deterministic stages).")
     p.add_argument("specs_dir", help="Path to the specs/ directory (NNN-* feature folders).")
+    p.add_argument("--code", default=None, help="Optional source tree to merge as a CODE source (enables the coverage view).")
     p.add_argument("--work", default=".synthesis", help="Working dir for IR artifacts (default: .synthesis).")
     p.add_argument("--project-name", default=None, help="Display name for the synthesis.")
     p.add_argument("--out", default=None, help="Render the storybook here. Requires the agent's IR files to exist.")
@@ -72,20 +86,45 @@ def main(argv: list[str] | None = None) -> int:
     corpus = work / "corpus.json"
     arch = work / "architecture_model.json"
     doc = work / "document_model.json"
+    locators_file = work / "locators.txt"
 
-    # ── stage 0: adapt (always) ────────────────────────────────────────────
-    rc = adapter_speckit.main([args.specs_dir, "--out", str(corpus)]
+    # ── stage 0: adapt specs (always), optionally merge a code source ──────
+    spec_corpus = work / "corpus-specs.json"
+    rc = adapter_speckit.main([args.specs_dir, "--out", str(spec_corpus)]
                               + (["--project-name", args.project_name] if args.project_name else []))
     if rc != 0:
-        print("synthesize: adapter failed.", file=sys.stderr)
+        print("synthesize: spec adapter failed.", file=sys.stderr)
         return rc
-    n = len(corpus.read_text().split('"id"')) - 1  # cheap fragment count for the brief
+    merged = FragmentCorpus.model_validate_json(spec_corpus.read_text())
+
+    if args.code:
+        code_corpus = work / "corpus-code.json"
+        rc = adapter_code.main([args.code, "--out", str(code_corpus)]
+                               + (["--project-name", args.project_name] if args.project_name else []))
+        if rc != 0:
+            print("synthesize: code adapter failed.", file=sys.stderr)
+            return rc
+        code = FragmentCorpus.model_validate_json(code_corpus.read_text())
+        clash = merged.locators() & code.locators()
+        if clash:
+            print(f"synthesize: locator collision between spec and code corpora: {sorted(clash)[:3]}",
+                  file=sys.stderr)
+            return 1
+        merged = FragmentCorpus(project_name=merged.project_name,
+                                fragments=[*merged.fragments, *code.fragments])
+
+    # the single corpus the agent reasons over + the gate checks against
+    corpus.write_text(merged.model_dump_json(indent=2))
+    # the precise, grounded input for reasoning: every citable locator, one per line
+    locators_file.write_text("\n".join(f"{f.kind:12} {f.id}" for f in merged.fragments) + "\n")
+    n = len(merged.fragments)
 
     ir_ready = arch.exists() and doc.exists()
 
     # ── scaffold path: agent hasn't produced the IR yet ────────────────────
     if not ir_ready:
-        print(HAND_OFF.format(corpus=corpus, arch=arch, doc=doc, n=n))
+        print(HAND_OFF.format(corpus=corpus, arch=arch, doc=doc, n=n, locators=locators_file,
+                              coverage_hint=_COVERAGE_HINT if args.code else ""))
         if args.out:
             print("synthesize: --out given but the agent's IR files are not present yet; "
                   "produce them (see brief above), then re-run.", file=sys.stderr)

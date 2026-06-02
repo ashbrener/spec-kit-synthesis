@@ -72,3 +72,28 @@ def test_finish_path_verifies_and_renders(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "verify: PASS" in r.stdout
     assert out.exists() and out.read_text().startswith("<!DOCTYPE html>")
+
+
+def _tiny_src(root: Path) -> Path:
+    s = root / "src"
+    s.mkdir(parents=True)
+    (s / "engine.sh").write_text("#!/usr/bin/env bash\nrun() {\n  echo go\n}\n")
+    return s
+
+
+def test_code_flag_merges_corpus_and_briefs_coverage(tmp_path):
+    specs = _tiny_specs(tmp_path)
+    src = _tiny_src(tmp_path)
+    work = tmp_path / "work"
+    r = _run([str(specs), "--code", str(src), "--work", str(work), "--project-name", "Demo"])
+    assert r.returncode == 0, r.stderr
+    # merged corpus carries BOTH spec and code fragments
+    corpus = json.loads((work / "corpus.json").read_text())
+    types = {f["source"]["type"] for f in corpus["fragments"]}
+    assert types == {"spec", "code"}, types
+    # the brief tells the agent to produce the coverage view
+    assert "coverage[]" in r.stdout
+    # the grounded locator list is written
+    assert (work / "locators.txt").exists()
+    locs = (work / "locators.txt").read_text()
+    assert "engine.sh" in locs and "001-demo" in locs
