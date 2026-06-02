@@ -129,6 +129,10 @@ def verify(
         _check_refs("Decision", d.id, d.source_refs)
     for h in arch.history:
         _check_refs("EvolutionNote", h.id, h.source_refs)
+    for ci in arch.coverage:
+        # A coverage row's spec_refs and code_refs must resolve like any other
+        # provenance — a coverage claim is as grounded as any claim (DESIGN §5.8).
+        _check_refs("Coverage", ci.area, list(ci.spec_refs) + list(ci.code_refs))
 
     # ── Walk the document blocks for checks 2, 3, 4 ─────────────────────────
     for section in doc.sections:
@@ -179,8 +183,13 @@ def verify(
                         )
                     )
 
-            # Check 4: any source_ref on the block must resolve into the corpus.
-            for ref in block.source_refs:
+            # Check 4: any source_ref on the block must resolve into the corpus —
+            # including the refs carried inside a coverage block's rows.
+            block_refs = list(block.source_refs)
+            if block.coverage:
+                for ci in block.coverage:
+                    block_refs += list(ci.spec_refs) + list(ci.code_refs)
+            for ref in block_refs:
                 if ref.locator not in locators:
                     violations.append(
                         Violation(
