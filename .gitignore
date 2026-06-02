@@ -2,3 +2,10 @@
 .env.*
 *.log
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# per-run build artifacts (stateless; regenerated each run — DESIGN §11.2 #4)
+.synthesis/
