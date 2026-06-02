@@ -1,0 +1,23 @@
+[project]
+name = "spec-kit-synthesis"
+version = "0.1.0"
+description = "Synthesize a project's scattered spec-kit specs into one faithful, interactive whole-system architecture storybook (HTML)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+# Toolchain is uv, not pip (DESIGN §6). Deterministic scripts live under skill/scripts;
+# they contain NO LLM calls — the in-session agent is the reasoning engine (DESIGN §6).
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["skill/scripts"]
+testpaths = ["skill/tests"]
