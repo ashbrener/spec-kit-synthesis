@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 250" width="960" height="250" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="One document, three reading depths: Overview is plain-English and always visible; Technical reveals engineering detail; Sources shows named, source-typed citations behind every claim.">
+  <rect x="1" y="1" width="958" height="248" rx="16" fill="#faf7f0" stroke="#d2c9b3" stroke-width="1.5"/>
+
+  <text x="28" y="40" font-size="13" letter-spacing="2.5" fill="#b3471d" font-weight="700">ONE DOCUMENT · THREE READING DEPTHS</text>
+  <line x1="28" y1="52" x2="120" y2="52" stroke="#b3471d" stroke-width="2"/>
+
+  <!-- the depth control -->
+  <g transform="translate(28,74)">
+    <rect x="0" y="0" width="300" height="34" rx="17" fill="#faf7f0" stroke="#d2c9b3"/>
+    <rect x="3" y="3" width="98" height="28" rx="14" fill="#b3471d"/>
+    <text x="52" y="22" font-size="12" fill="#ffffff" text-anchor="middle" font-weight="600">Overview</text>
+    <text x="150" y="22" font-size="12" fill="#56524a" text-anchor="middle">Technical</text>
+    <text x="252" y="22" font-size="12" fill="#56524a" text-anchor="middle">Sources</text>
+  </g>
+  <text x="340" y="96" font-size="12" fill="#87827a">— one control; the same document serves an exec and a developer.</text>
+
+  <!-- three stacked layers -->
+  <!-- Layer 0 -->
+  <rect x="28" y="130" width="904" height="32" rx="8" fill="#f3efe4" stroke="#87827a"/>
+  <text x="46" y="151" font-size="13" fill="#17150f"><tspan font-weight="700">Overview</tspan> · Layer 0 — plain-English: what the system is and why. An executive reads only this and is done.</text>
+
+  <!-- Layer 1 -->
+  <rect x="28" y="168" width="904" height="32" rx="8" fill="#f6e6da" stroke="#b3471d"/>
+  <text x="46" y="189" font-size="13" fill="#17150f"><tspan font-weight="700">Technical</tspan> · Layer 1 — revealed on demand: entity tables, the data model, components, flows, infra.</text>
+
+  <!-- Layer 2 -->
+  <rect x="28" y="206" width="904" height="32" rx="8" fill="#e2ece7" stroke="#1f5048"/>
+  <text x="46" y="227" font-size="13" fill="#17150f"><tspan font-weight="700">Sources</tspan> · Layer 2 — named, source-typed citations behind every claim:</text>
+  <g font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="10">
+    <rect x="612" y="214" width="92" height="17" rx="4" fill="#faf7f0" stroke="#b3471d"/><text x="620" y="226" fill="#8f3614">spec · 004</text>
+    <rect x="710" y="214" width="96" height="17" rx="4" fill="#faf7f0" stroke="#1f5048"/><text x="718" y="226" fill="#1f5048">code · app.py</text>
+    <rect x="812" y="214" width="104" height="17" rx="4" fill="#faf7f0" stroke="#6a3a6f"/><text x="820" y="226" fill="#6a3a6f">doc · ADR-007</text>
+  </g>
+</svg>
