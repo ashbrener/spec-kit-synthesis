@@ -29,9 +29,21 @@ Synthesis is a *reasoning* task — reconciling many sources into one current-st
 
 ## How it works
 
-<p align="center">
-  <img alt="Pipeline: sources flow through source-typed adapters into a fragment corpus; the in-session agent extracts, reconciles and composes; a deterministic fail-closed verify gate and renderer produce an interactive HTML storybook." src="docs/diagram-pipeline.svg" width="100%">
-</p>
+```mermaid
+flowchart LR
+    S1["specs/"]:::src --> AD
+    S2["code"]:::src --> AD
+    S3["design docs / ADRs"]:::src --> AD
+    AD["source-typed<br/>adapters"]:::code --> FC["fragment<br/>corpus"]:::ir
+    FC --> EX["extract"]:::agent --> RC["reconcile<br/>· the product ·"]:::agent --> CO["compose"]:::agent --> VG{"verify<br/>fail-closed"}:::code
+    VG -->|pass| RN["render"]:::code --> HTML["interactive<br/>storybook"]:::out
+    VG -.->|"fail: fix &amp; re-reason"| EX
+    classDef src fill:#f3efe4,stroke:#b3471d,color:#17150f
+    classDef code fill:#e2ece7,stroke:#1f5048,color:#17150f
+    classDef agent fill:#f6e6da,stroke:#b3471d,color:#17150f
+    classDef ir fill:#ffffff,stroke:#87827a,color:#17150f
+    classDef out fill:#efe4f0,stroke:#6a3a6f,color:#17150f
+```
 
 1. **Adapt (code).** A source adapter turns each input into a *source-typed fragment corpus* — `spec` fragments from spec folders, `code` fragments from a source tree, `design_doc` fragments from ADRs/design docs. The core never learns what a "spec" is; it reasons over uniform fragments. This is the seam that lets new sources drop in without a rewrite.
 2. **Extract → reconcile → compose (the in-session agent).** The agent reads the corpus and reasons the three phases: pull each source's claims/decisions/open-questions; **reconcile** them into one current-state model — merging overlaps, demoting superseded behaviour to *evolution notes*, surfacing contradictions as *open questions*; then compose altitude-tagged prose, callouts, and declarative diagrams. Reconcile is the product; everything else serves it.
@@ -42,9 +54,17 @@ Synthesis is a *reasoning* task — reconciling many sources into one current-st
 
 A single HTML file you can read at **three depths** via one control — so an executive and a developer read the same document:
 
-<p align="center">
-  <img alt="Three reading depths in one document: Overview is plain-English and always visible; Technical reveals engineering detail on demand; Sources shows named, source-typed citations behind every claim." src="docs/diagram-layers.svg" width="100%">
-</p>
+```mermaid
+flowchart TD
+    R(["Read as …"]):::ctl --> L0 & L1 & L2
+    L0["Overview · Layer 0<br/>plain-English — an exec stops here"]:::l0
+    L1["Technical · Layer 1<br/>entity tables, data model, infra"]:::l1
+    L2["Sources · Layer 2<br/>named, source-typed citations"]:::l2
+    classDef ctl fill:#b3471d,stroke:#b3471d,color:#ffffff
+    classDef l0 fill:#f3efe4,stroke:#87827a,color:#17150f
+    classDef l1 fill:#f6e6da,stroke:#b3471d,color:#17150f
+    classDef l2 fill:#e2ece7,stroke:#1f5048,color:#17150f
+```
 
 Plus: hand-rendered theme-aware **SVG diagrams** (pipeline, data-model mapping, lifecycle ladder, decision flows), a light/dark toggle, a scrollspy table of contents, three callout types (**decision** · **evolution** · **unspecified**), and — when a code source is supplied — a **coverage view** that cross-checks the specified architecture against the actual code.
 
