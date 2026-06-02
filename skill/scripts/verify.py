@@ -55,6 +55,7 @@ CHECK_BLOCK_CLAIMS_EXIST = "BLOCK_CLAIMS_EXIST"
 CHECK_NON_EMPTY_GROUNDING = "NON_EMPTY_GROUNDING"
 CHECK_BLOCK_SOURCE_REFS = "BLOCK_SOURCE_REFS_CONSISTENT"
 CHECK_COVERAGE_NOTE = "COVERAGE_NOTE_PRESENT"
+CHECK_CALLOUT_BODY = "CALLOUT_BODY_PRESENT"
 
 
 @dataclass(frozen=True)
@@ -161,6 +162,22 @@ def verify(
                         ),
                     )
                 )
+
+            # Check 6: a callout must carry a non-empty body — a tag alone is an
+            # empty box (Codex full-run finding: evolution/unspecified callouts
+            # rendered as labels with no content). Code-enforced so it can't recur.
+            if block.type is BlockType.CALLOUT:
+                if not (block.prose and block.prose.strip()):
+                    violations.append(
+                        Violation(
+                            check=CHECK_CALLOUT_BODY,
+                            object_id=block_id,
+                            detail=(
+                                f"callout '{block.callout_tag or block.callout_kind}' has no body "
+                                f"prose; a tag alone renders as an empty box."
+                            ),
+                        )
+                    )
 
             # Check 4: any source_ref on the block must resolve into the corpus.
             for ref in block.source_refs:
