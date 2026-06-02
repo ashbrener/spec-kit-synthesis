@@ -775,23 +775,23 @@ it is this seam.
 The seams and invariants (11.1–11.2) are present from Phase 1; later phases add
 *adapters and surfaces*, not rework.
 
-- **Phase 1 — Prove the engine.** spec-kit adapter → fragment corpus → the full
-  extract/reconcile/compose/verify core → document model → themed interactive SVG
-  renderer with the Layer 0/1/2 drill-down and named citations. Acceptance: output
-  for the bridge fixture is judged as faithful and as readable as the handwritten
-  target (`examples/`), via cross-model review. *This is the proof the whole
-  architecture rests on.*
-- **Phase 2 — Code as a second source.** A code adapter emitting source-typed
-  refs; reconcile now reconciles *intent vs reality* and produces the coverage
-  view (specced-but-unbuilt / built-but-unspecced). This is the highest-value
-  next source and the real test that the seam holds — it is **planned, not
-  hypothetical**, which is why provenance is source-typed from Phase 1.
-- **Phase 3 — Reach & polish.** Host-theme detection; the optional voice profile;
-  additional source adapters (design-doc/ADR/RFC) as needed; richer diagram
-  affordances.
-- **Phase 4 — (Strategic, decide later) Standalone engine / OSS.** Only once the
-  core has earned it across ≥2 real source types. The seam makes this a packaging
-  exercise, not a rewrite.
+- **Phase 1 — Prove the engine. ✅ SHIPPED.** spec-kit adapter → fragment corpus
+  → the full extract/reconcile/compose/verify core → document model → themed
+  interactive SVG renderer with the Layer 0/1/2 drill-down and named citations.
+  Acceptance met: the generated bridge storybook was judged faithful (0/0/0) by
+  cross-model review after a 10→0 convergence (`examples/generated/RESULT.md`).
+  *This is the proof the whole architecture rests on.*
+- **Phase 2 — Code as a second source. ✅ SHIPPED.** A code adapter emitting
+  source-typed refs; the coverage view (specced-but-unbuilt / built-but-
+  unspecced). The seam held: a merged spec+code corpus passed the *unchanged*
+  Phase-1 gate. Coverage run judged faithful (0/0/0) after a 3→0 convergence.
+- **Phase 3 — Reach & polish. 🟡 IN PROGRESS.** Done: the push-button one-command
+  UX (specs and specs+code), CI, an in-repo e2e fixture. Now: additional source
+  adapters (design-doc/ADR) and host-theme detection. Later: the optional voice
+  profile; richer diagram affordances.
+- **Phase 4 — (Strategic, decide later) Standalone engine / OSS.** The
+  precondition is now met (the core has earned it across ≥2 real source types —
+  spec-kit and code). The seam makes this a packaging exercise, not a rewrite.
 
 ### 11.5 The discipline that keeps "right, not narrow" honest
 
