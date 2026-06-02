@@ -97,3 +97,23 @@ def test_code_flag_merges_corpus_and_briefs_coverage(tmp_path):
     assert (work / "locators.txt").exists()
     locs = (work / "locators.txt").read_text()
     assert "engine.sh" in locs and "001-demo" in locs
+
+
+def _tiny_docs(root: Path) -> Path:
+    d = root / "docs"
+    d.mkdir(parents=True)
+    (d / "architecture.md").write_text("# Architecture\n\n## Why bash\n\nZero runtime.\n")
+    return d
+
+
+def test_docs_flag_merges_design_doc_source(tmp_path):
+    specs = _tiny_specs(tmp_path)
+    docs = _tiny_docs(tmp_path)
+    work = tmp_path / "work"
+    r = _run([str(specs), "--docs", str(docs), "--work", str(work), "--project-name", "Demo"])
+    assert r.returncode == 0, r.stderr
+    corpus = json.loads((work / "corpus.json").read_text())
+    types = {f["source"]["type"] for f in corpus["fragments"]}
+    assert types == {"spec", "design_doc"}, types
+    locs = (work / "locators.txt").read_text()
+    assert "architecture.md" in locs

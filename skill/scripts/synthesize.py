@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 
 import adapter_code
+import adapter_doc
 import adapter_speckit
 import render as render_mod
 import verify as verify_mod
@@ -75,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Drive the spec-kit-synthesis pipeline (deterministic stages).")
     p.add_argument("specs_dir", help="Path to the specs/ directory (NNN-* feature folders).")
     p.add_argument("--code", default=None, help="Optional source tree to merge as a CODE source (enables the coverage view).")
+    p.add_argument("--docs", default=None, help="Optional free-form design-doc / ADR tree to merge as a DESIGN_DOC source.")
     p.add_argument("--work", default=".synthesis", help="Working dir for IR artifacts (default: .synthesis).")
     p.add_argument("--project-name", default=None, help="Display name for the synthesis.")
     p.add_argument("--out", default=None, help="Render the storybook here. Requires the agent's IR files to exist.")
@@ -97,21 +99,33 @@ def main(argv: list[str] | None = None) -> int:
         return rc
     merged = FragmentCorpus.model_validate_json(spec_corpus.read_text())
 
-    if args.code:
-        code_corpus = work / "corpus-code.json"
-        rc = adapter_code.main([args.code, "--out", str(code_corpus)]
-                               + (["--project-name", args.project_name] if args.project_name else []))
+    def _merge_source(adapter, src_dir: str, label: str, out_name: str) -> int:
+        """Adapt an extra source and merge it into `merged`, collision-checked."""
+        nonlocal merged
+        out = work / out_name
+        rc = adapter.main([src_dir, "--out", str(out)]
+                          + (["--project-name", args.project_name] if args.project_name else []))
         if rc != 0:
-            print("synthesize: code adapter failed.", file=sys.stderr)
+            print(f"synthesize: {label} adapter failed.", file=sys.stderr)
             return rc
-        code = FragmentCorpus.model_validate_json(code_corpus.read_text())
-        clash = merged.locators() & code.locators()
+        extra = FragmentCorpus.model_validate_json(out.read_text())
+        clash = merged.locators() & extra.locators()
         if clash:
-            print(f"synthesize: locator collision between spec and code corpora: {sorted(clash)[:3]}",
+            print(f"synthesize: locator collision merging {label} corpus: {sorted(clash)[:3]}",
                   file=sys.stderr)
             return 1
         merged = FragmentCorpus(project_name=merged.project_name,
-                                fragments=[*merged.fragments, *code.fragments])
+                                fragments=[*merged.fragments, *extra.fragments])
+        return 0
+
+    if args.code:
+        rc = _merge_source(adapter_code, args.code, "code", "corpus-code.json")
+        if rc != 0:
+            return rc
+    if args.docs:
+        rc = _merge_source(adapter_doc, args.docs, "design-doc", "corpus-docs.json")
+        if rc != 0:
+            return rc
 
     # the single corpus the agent reasons over + the gate checks against
     corpus.write_text(merged.model_dump_json(indent=2))
