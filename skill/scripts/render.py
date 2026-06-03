@@ -469,13 +469,88 @@ def _edges_vertical(edges: list[DiagramEdge], pos: dict[str, tuple[float, float]
     return "".join(parts)
 
 
-# Registry: extend here for `mapping` / `panel` (signatures identical). The renderer
-# falls back to `flow` for any layout not yet hand-laid, so a new layout value never
-# crashes a build — it degrades to a generic, still-correct stacked rendering.
+def _layout_mapping(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """Two columns connected left→right by edges — a "this maps to that" table.
+
+    The node set is split by edge direction: every node that is some edge's src
+    sits in the left column, every node that is some edge's dst in the right;
+    a node that is both (or neither) defaults left. Rows align by first
+    appearance, so an edge draws a clean horizontal connector across the gap.
+    Matches the north-star's Fig. 2 (filesystem → tracker mapping).
+    """
+    srcs = [n for n in graph.nodes if any(e.src == n.id for e in graph.edges)]
+    dsts = [n for n in graph.nodes if any(e.dst == n.id for e in graph.edges)
+            and not any(e.src == n.id for e in graph.edges)]
+    leftovers = [n for n in graph.nodes if n not in srcs and n not in dsts]
+    left, right = srcs + leftovers, dsts
+    rows = max(len(left), len(right), 1)
+    width = 940
+    nw, nh, vgap = 300, 38, 10
+    lx, rx, top = 40, width - 40 - nw, 50
+    height = top + rows * (nh + vgap) + 20
+    pos: dict[str, tuple[float, float]] = {}
+    parts = [_markers(fig_id)]
+    parts.append(_svg_text(lx, 34, "tlab", 11, "FROM"))
+    parts.append(_svg_text(rx, 34, "tlab", 11, "TO"))
+    for col, x in ((left, lx), (right, rx)):
+        for i, node in enumerate(col):
+            y = top + i * (nh + vgap)
+            pos[node.id] = (x, y)
+            parts.append(f'<g {_node_attrs(node)}>')
+            parts.append(f'<rect x="{x:g}" y="{y:g}" width="{nw}" height="{nh}" rx="9" class="d-node"/>')
+            parts.append(_svg_text(x + 16, y + nh / 2 + 4, "tm", 12, node.label))
+            parts.append('</g>')
+    for e in graph.edges:
+        if e.src not in pos or e.dst not in pos:
+            continue
+        sx, sy = pos[e.src]
+        dx, dy = pos[e.dst]
+        cls = "d-flow-em" if e.emphasis else "d-flow"
+        marker = f"{fig_id}-af" if e.emphasis else f"{fig_id}-am"
+        parts.append(f'<path class="{cls}" d="M{sx + nw:g} {sy + nh / 2:g} H {dx:g}" marker-end="url(#{marker})"/>')
+    return "".join(parts), width, height
+
+
+def _layout_panel(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """A responsive grid of labelled boxes — a components/areas overview.
+
+    Edges are ignored (a panel is a set, not a flow); each node is a card that
+    keeps its hover caption + click-to-jump. Three columns, wrapping by count.
+    """
+    n = len(graph.nodes)
+    if n == 0:
+        return _markers(fig_id), 940, 100
+    width = 940
+    cols = 3 if n > 4 else max(1, n)
+    cw, ch, gx, gy = (width - 40 * 2 - (cols - 1) * 20) / cols, 70, 20, 20
+    margin_x, top = 40, 30
+    rows = (n + cols - 1) // cols
+    height = top + rows * (ch + gy)
+    parts = [_markers(fig_id)]
+    for i, node in enumerate(graph.nodes):
+        r, c = divmod(i, cols)
+        x = margin_x + c * (cw + gx)
+        y = top + r * (ch + gy)
+        parts.append(f'<g {_node_attrs(node)}>')
+        parts.append(f'<rect x="{x:g}" y="{y:g}" width="{cw:g}" height="{ch}" rx="11" class="d-panel"/>')
+        parts.append(f'<text class="t" x="{x + 16:g}" y="{y + 28:g}" font-size="13" font-weight="600">{esc(node.label)}</text>')
+        if node.caption:
+            # caption wraps to a second line inside the card (truncated to fit)
+            cap = node.caption if len(node.caption) <= 46 else node.caption[:45] + "…"
+            parts.append(f'<text class="tm" x="{x + 16:g}" y="{y + 48:g}" font-size="10.5">{esc(cap)}</text>')
+        parts.append('</g>')
+    return "".join(parts), width, height
+
+
+# Registry of hand-laid diagram layouts. The renderer falls back to `flow` for any
+# layout not present, so a new layout value never crashes a build — it degrades to a
+# generic, still-correct stacked rendering.
 _LAYOUTS = {
     "pipeline": _layout_pipeline,
     "flow": _layout_flow,
     "ladder": _layout_ladder,
+    "mapping": _layout_mapping,
+    "panel": _layout_panel,
 }
 
 
