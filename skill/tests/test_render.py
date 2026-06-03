@@ -215,3 +215,38 @@ def test_text_is_html_escaped():
     assert "<script>alert" not in out
     assert "&lt;script&gt;alert" in out
     assert "&amp; more" in out
+
+
+def test_mapping_and_panel_layouts_render_distinctly():
+    """mapping + panel are now hand-laid (no longer silent flow fallbacks)."""
+    import render as render_mod
+    from schema import (Altitude, Block, BlockType, DiagramEdge, DiagramGraph,
+                        DiagramNode, DocumentModel, Section)
+
+    mapping = DiagramGraph(layout="mapping",
+        nodes=[DiagramNode(id="repo", label="repository"), DiagramNode(id="proj", label="Project"),
+               DiagramNode(id="spec", label="spec"), DiagramNode(id="issue", label="Issue")],
+        edges=[DiagramEdge(src="repo", dst="proj"), DiagramEdge(src="spec", dst="issue", emphasis=True)])
+    panel = DiagramGraph(layout="panel",
+        nodes=[DiagramNode(id="a", label="parser", caption="reads specs"),
+               DiagramNode(id="b", label="reconcile"), DiagramNode(id="c", label="render"),
+               DiagramNode(id="d", label="verify"), DiagramNode(id="e", label="adapter")])
+    doc = DocumentModel(title="Demo", sections=[Section(id="s", number=1, title="Diagrams", blocks=[
+        Block(type=BlockType.DIAGRAM, altitude=Altitude.FUNCTIONAL, diagram=mapping),
+        Block(type=BlockType.DIAGRAM, altitude=Altitude.FUNCTIONAL, diagram=panel),
+    ])])
+    html = render_mod.render(doc, render_mod.DEFAULT_THEME)
+    # mapping draws FROM/TO column labels; panel labels each card
+    assert "FROM" in html and "TO" in html
+    assert "repository" in html and "Project" in html
+    assert "parser" in html and "reads specs" in html
+    # balanced svg tags (the page also carries the theme-toggle icon svg)
+    assert html.count("<svg") == html.count("</svg>")
+    # both diagrams rendered as figures
+    assert html.count("<figure") == 2
+
+def test_mapping_panel_are_registered_not_flow_fallback():
+    """mapping + panel must be their own layouts, not the flow fallback."""
+    import render as render_mod
+    assert render_mod._LAYOUTS.get("mapping") is render_mod._layout_mapping
+    assert render_mod._LAYOUTS.get("panel") is render_mod._layout_panel
