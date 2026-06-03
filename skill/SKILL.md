@@ -131,7 +131,17 @@ Turn the `ArchitectureModel` into a `DocumentModel`, section by section:
   `unspecified` (one per open question / gap — the fail-closed surface).
 - Diagrams: emit a declarative `DiagramGraph` (nodes/edges + `layout`), each
   node carrying the `source_refs` of the claim it depicts. The renderer lays it
-  out to interactive SVG; you describe *what it means*, not coordinates.
+  out to interactive SVG; you describe *what it means*, not coordinates. Five
+  layouts are available: `pipeline` (L→R sequence), `flow` (top-down decision),
+  `ladder` (ordered rising rungs), `mapping` (two columns, "X → Y"), `panel`
+  (a grid of component/area cards).
+- **Optional voice profile.** If a `synthesis.voice.md` exists at the project
+  root (or `--voice` is supplied), honour it here: it sets *how* prose reads —
+  point of view, tone, casing, banned words, domain terminology, number
+  formatting. It shapes phrasing ONLY. It must never change *which* claims
+  exist, demote a citation, or soften a gap — the verify gate and invariants
+  are unaffected by voice. A voice profile can change the wording, never the
+  truth. Absent one, write in the clear, plain register of the north-star.
 
 Persist `.synthesis/document_model.json`.
 
