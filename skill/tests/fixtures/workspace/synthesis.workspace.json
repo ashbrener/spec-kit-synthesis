@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1.0",
+  "title": "Demo Portal",
+  "project_name": "demo",
+  "members": [
+    {"origin": "guide", "path": "guide", "adapter": "doc", "role": "docs", "title": "Product Guide", "description": "The plain-English guide to what the product does."},
+    {"origin": "svc-a", "path": "svc_a", "adapter": "code", "role": "code", "title": "Service A", "description": "The backend ingestion service."},
+    {"origin": "svc-b", "path": "svc_b", "adapter": "code", "role": "code", "title": "Service B", "description": "The frontend delivery service."}
+  ]
+}
