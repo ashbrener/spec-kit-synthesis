@@ -58,6 +58,7 @@ class SourceRef(BaseModel):
     name: str = Field(..., description="Human label for the citation chip, e.g. 'spec-004 · data-model.md'.")
     locator: str = Field(..., description="Stable key resolvable into the FragmentCorpus, e.g. a fragment id.")
     anchor: Optional[str] = Field(None, description="Optional finer pointer (heading, line range, symbol).")
+    origin: Optional[str] = Field(None, description="Workspace-member id when federating repos (portal — spec 002); namespaces the locator. None = single-repo.")
 
 
 # ───────────────────────────── adapter output ──────────────────────────────
@@ -90,6 +91,25 @@ class FragmentCorpus(BaseModel):
 
     def locators(self) -> set[str]:
         return {f.id for f in self.fragments}
+
+    def with_origin(self, origin: str) -> "FragmentCorpus":
+        """Return a copy with every fragment id + self-referential locator namespaced by
+        ``origin`` (workspace federation — spec 002), the SourceRef.origin stamped, and the
+        locator==id invariant preserved. Idempotent. Single-repo runs never call this, so their
+        bare locators and unchanged golden files are unaffected (origin stays None)."""
+        pref = f"{origin}::"
+
+        def ns(s: str) -> str:
+            return s if s.startswith(pref) else pref + s
+
+        frags = [
+            f.model_copy(update={
+                "id": ns(f.id),
+                "source": f.source.model_copy(update={"locator": ns(f.source.locator), "origin": origin}),
+            })
+            for f in self.fragments
+        ]
+        return self.model_copy(update={"fragments": frags})
 
 
 # ───────────────────────── extract output (per source) ─────────────────────

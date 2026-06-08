@@ -61,6 +61,32 @@ def test_corpus_locators_roundtrip():
     assert corpus.locators() == {"spec-001#f1"}
 
 
+def _collide(name):
+    # two repos that both have a fragment with the SAME bare locator
+    sr = SourceRef(type=SourceType.CODE, name="config.sh", locator="src/config.sh#main")
+    return FragmentCorpus(project_name=name,
+                          fragments=[Fragment(id="src/config.sh#main", source=sr, kind="code", text="x")])
+
+
+def test_with_origin_namespaces_and_dedupes():
+    # portal federation (spec 002): with_origin makes locators globally unique across repos.
+    be = _collide("backend").with_origin("backend")
+    fe = _collide("frontend").with_origin("frontend")
+    f = be.fragments[0]
+    assert f.id == "backend::src/config.sh#main"
+    assert f.source.locator == f.id          # self-referential invariant preserved
+    assert f.source.origin == "backend"      # origin stamped
+    assert be.locators().isdisjoint(fe.locators())  # no more cross-repo collision
+    assert be.with_origin("backend").fragments[0].id == f.id  # idempotent
+
+
+def test_single_repo_is_unchanged_by_origin_axis():
+    # backward-compat: a normal corpus keeps bare locators and origin=None (golden files safe).
+    plain = _collide("solo")
+    assert plain.locators() == {"src/config.sh#main"}
+    assert plain.fragments[0].source.origin is None
+
+
 def test_extra_fields_forbidden():
     # extra="forbid" — a malformed phase output is an error, not best-effort (DESIGN §6).
     with pytest.raises(ValidationError):
