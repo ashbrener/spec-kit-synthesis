@@ -370,6 +370,39 @@ class DocumentModel(BaseModel):
     sections: list[Section] = Field(default_factory=list)
 
 
+# ───────────────────────── workspace (portal — spec 002) ───────────────────
+
+class WorkspaceMember(BaseModel):
+    """One repo/source federated into a portal workspace (spec 002).
+
+    Each member yields ONE faithful storybook page via the unchanged engine; its
+    `origin` namespaces its locators (Phase A) and names its page in the site.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    origin: str = Field(..., description="Stable member id; namespaces this member's locators and names its page.")
+    path: str = Field(..., description="Path to the member's source, relative to the manifest dir (or absolute).")
+    adapter: Literal["speckit", "code", "doc"] = "speckit"
+    role: Literal["docs", "spec", "code", "intent"] = "spec"
+    title: Optional[str] = Field(None, description="Display title for the index card (defaults to origin).")
+    description: Optional[str] = Field(None, description="One-line description for the index card.")
+    pin: Optional[str] = Field(None, description="Commit to pin for a reproducible build (recorded; checkout is the operator's job).")
+    base_url: Optional[str] = Field(None, description="Optional published host base for 'view source' links (else self-contained).")
+
+
+class WorkspaceManifest(BaseModel):
+    """A portal workspace: the members to federate + presentation (spec 002)."""
+
+    model_config = {"extra": "forbid"}
+
+    schema_version: str = SCHEMA_VERSION
+    title: Optional[str] = Field(None, description="Portal / index title.")
+    project_name: Optional[str] = Field(None, description="Brand wordmark for the index.")
+    members: list[WorkspaceMember] = Field(default_factory=list)
+    theme: dict[str, str] = Field(default_factory=dict, description="Optional theme-token overrides for the whole portal.")
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "SourceType", "SourceRef",
@@ -379,4 +412,5 @@ __all__ = [
     "BlockType", "CalloutKind",
     "DiagramNode", "DiagramEdge", "DiagramGraph",
     "Block", "Section", "MetaPair", "DocumentModel",
+    "WorkspaceMember", "WorkspaceManifest",
 ]
