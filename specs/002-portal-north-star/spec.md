@@ -34,6 +34,11 @@ primitive**: it resolves to a sibling page+anchor (docs→spec) or a bundled sou
 
 ### Session 2026-06-08 (decisions locked)
 
+- **Audience — the readable storybook is the product.** The portal exists to serve the
+  plain-English storybook for *normal people*; its prose is deliberately simpler than the source
+  markdown, with every claim's source always one click away (citation chip → spec page → bundled
+  source-view). The atlas / graph / `verify_links` machinery is **subordinate**: it exists so the
+  simple read stays trustworthy and traceable, and the reader never sees it. (DESIGN §11.2 #8.)
 - **Delivery — STATIC, not an SPA.** A directory of self-contained storybook pages + an atlas page +
   `search.json`. Navigation, search, and click-through drill-down come from plain `<a>` links + the
   inline vanilla JS already in `render.py`. This preserves byte-determinism, `file://` portability,

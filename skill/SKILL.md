@@ -120,6 +120,12 @@ it is the diffable record of what the run believes is true.
 
 Turn the `ArchitectureModel` into a `DocumentModel`, section by section:
 
+**Write for a general reader (invariant #8).** The storybook is the plain-English read for a
+*non-specialist*; your prose must be **simpler than the source markdown** it is distilled from —
+translate jargon, prefer short sentences, lead with the plain meaning. Simpler on the surface, but
+every claim keeps its source one click away (the citation chips) and every gap stays an
+`unspecified` callout: **simplification never costs faithfulness.**
+
 - Each `Block` is `prose`/`table`/`callout`/`diagram`/`coverage`, tagged with
   `altitude`. Functional blocks form Layer 0 (always visible, stand-alone — an
   exec reads only these and understands the system). Technical blocks are
