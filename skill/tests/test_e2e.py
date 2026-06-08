@@ -277,13 +277,14 @@ def test_render_produces_deterministic_parseable_html():
 
     # parses as HTML
     _Parses().feed(html_out)
-    # is a full document
+    # is a full document in the editorial design system (renderer v2)
     assert html_out.startswith("<!DOCTYPE html>")
-    # the depth control (reading-altitude segmented buttons) is present
-    assert 'class="seg depth"' in html_out
-    assert 'data-d="0"' in html_out and 'data-d="2"' in html_out
-    # at least one citation chip rendered from a real source_ref
-    assert 'class="cite"' in html_out
+    assert 'header class="mast"' in html_out
+    # light-only: no global depth toggle / dark-mode machinery
+    assert "data-depth" not in html_out and "seg depth" not in html_out
+    # at least one source-typed citation chip rendered from a real source_ref
+    assert 'class="srcline"' in html_out
+    assert 'class="cite-t spec"' in html_out
     assert "spec-001 · spec.md" in html_out
     # deterministic: rendering twice is byte-identical
     again = render.render(doc, render.DEFAULT_THEME)

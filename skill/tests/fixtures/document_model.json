@@ -1,11 +1,20 @@
 {
   "schema_version": "0.1.0",
   "title": "Spec-Kit → Linear Bridge",
+  "title_accent": "Linear Bridge",
   "lede": "Your repository's spec-kit feature folders, mirrored into Linear as living, trackable issues — automatically, one way, and never by hand.",
+  "project_name": "speckit-linear",
+  "kicker": ["Architecture Storybook", "Synthesised from spec · code"],
+  "meta": [
+    {"label": "Project", "value": "speckit-linear"},
+    {"label": "Sources", "value": "spec · code"},
+    {"label": "Build", "value": "deterministic"}
+  ],
   "sections": [
     {
       "id": "what",
       "number": 1,
+      "strap": "The picture in one read",
       "title": "What this system is",
       "subtitle": "The one-paragraph version, then the why.",
       "blocks": [
@@ -52,6 +61,7 @@
           "altitude": "functional",
           "diagram": {
             "layout": "pipeline",
+            "title": "How a run reconciles the repository",
             "nodes": [
               {"id": "repo", "label": "repository", "caption": "The repository is the single source of truth: feature folders plus the committed binding config.", "target": "datamodel", "source_refs": [{"type": "spec", "name": "001 · spec.md", "locator": "spec-001"}]},
               {"id": "read", "label": "read", "caption": "Layer D reads every feature folder from disk.", "source_refs": [{"type": "code", "name": "src/reconcile.sh", "locator": "code-reconcile"}]},
@@ -102,6 +112,7 @@
           "altitude": "functional",
           "diagram": {
             "layout": "ladder",
+            "title": "The lifecycle ladder",
             "nodes": [
               {"id": "p0", "label": "Specifying", "caption": "Rank 0 — spec.md exists, no plan yet."},
               {"id": "p1", "label": "Planning", "caption": "Rank 1 — plan.md appears."},
@@ -154,6 +165,7 @@
           "altitude": "functional",
           "diagram": {
             "layout": "flow",
+            "title": "The write-authority decision",
             "nodes": [
               {"id": "start", "label": "before writing a feature", "caption": "Every write path begins here."},
               {"id": "check", "label": "is Linear ahead of the repo?", "caption": "The drift check decides whether Linear ranks higher than disk."},
@@ -201,6 +213,85 @@
           "source_refs": [
             {"type": "spec", "name": "003 · research.md · §1–2", "locator": "spec-003#research"},
             {"type": "code", "name": "src/git_helpers.sh · spec_dir_last_commit", "locator": "code-git-helpers"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "engine",
+      "number": 5,
+      "strap": "Seeing the shape",
+      "title": "The synthesis engine",
+      "subtitle": "Adapters feed one source-agnostic core; the core builds bottom-up; positions evolve over time.",
+      "blocks": [
+        {
+          "type": "prose",
+          "altitude": "functional",
+          "prose_style": "pull",
+          "prose": "The core never knows what a \"spec\" is — every source becomes a uniform, source-typed corpus.",
+          "claim_ids": ["c-engine"],
+          "source_refs": [
+            {"type": "design_doc", "name": "DESIGN.md · §11.1 the seam", "locator": "doc-design#seam"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "functional",
+          "diagram": {
+            "layout": "hub",
+            "title": "Adapters feed one source-agnostic core",
+            "nodes": [
+              {"id": "core", "label": "core", "caption": "The source-blind reconcile core."},
+              {"id": "spec", "label": "spec adapter", "caption": "spec-kit folders → fragments.", "source_refs": [{"type": "code", "name": "adapter_speckit.py", "locator": "code-adapter-spec"}]},
+              {"id": "code", "label": "code adapter", "caption": "source tree → fragments."},
+              {"id": "doc", "label": "design-doc", "caption": "ADRs / design docs → fragments."},
+              {"id": "corpus", "label": "corpus", "caption": "One source-typed fragment corpus."}
+            ],
+            "edges": [
+              {"src": "spec", "dst": "core"},
+              {"src": "code", "dst": "core"},
+              {"src": "doc", "dst": "core"}
+            ]
+          },
+          "claim_ids": ["c-engine"],
+          "source_refs": [
+            {"type": "design_doc", "name": "DESIGN.md · §11.1", "locator": "doc-design#seam", "anchor": "the source-agnostic seam"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "functional",
+          "diagram": {
+            "layout": "stack",
+            "title": "Three layers, built bottom-up",
+            "nodes": [
+              {"id": "render", "label": "render — model → one HTML file"},
+              {"id": "core2", "label": "core — extract · reconcile · compose · verify"},
+              {"id": "adapters", "label": "adapters — spec · code · design-doc → corpus"}
+            ],
+            "edges": []
+          },
+          "claim_ids": ["c-engine"],
+          "source_refs": [
+            {"type": "design_doc", "name": "DESIGN.md · §11.1 three layers", "locator": "doc-design#layers"}
+          ]
+        },
+        {
+          "type": "diagram",
+          "altitude": "technical",
+          "diagram": {
+            "layout": "timeline",
+            "title": "How a position evolves",
+            "nodes": [
+              {"id": "draft", "label": "draft", "caption": "first claim"},
+              {"id": "revised", "label": "revised", "caption": "superseded"},
+              {"id": "current", "label": "current", "caption": "in narrative", "target": "authority"}
+            ],
+            "edges": []
+          },
+          "claim_ids": ["c-evolution"],
+          "source_refs": [
+            {"type": "design_doc", "name": "DESIGN.md · §3 history", "locator": "doc-design#history"}
           ]
         }
       ]

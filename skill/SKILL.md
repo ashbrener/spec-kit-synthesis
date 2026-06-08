@@ -120,21 +120,33 @@ it is the diffable record of what the run believes is true.
 
 Turn the `ArchitectureModel` into a `DocumentModel`, section by section:
 
-- Each `Block` is `prose`/`table`/`callout`/`diagram`, tagged with `altitude`.
-  Functional blocks form Layer 0 (always visible, stand-alone — an exec reads
-  only these and understands the system). Technical blocks form Layer 1
-  (drill-down). Carry `claim_ids` on every prose/table block.
+- Each `Block` is `prose`/`table`/`callout`/`diagram`/`coverage`, tagged with
+  `altitude`. Functional blocks form Layer 0 (always visible, stand-alone — an
+  exec reads only these and understands the system). Technical blocks are
+  revealed per section in an inline "Technical detail" disclosure (renderer v2 —
+  there is no global depth toggle). Carry `claim_ids` on every prose/table block.
+  A prose block may set `prose_style` to `lead` (an opening emphasis line) or
+  `pull` (a pull-quote).
 - **The narrative must stand alone at Layer 0 and contain no source identifiers**
   (invariant #2). Citations ride only in each block's/section's `source_refs`,
-  rendered as Layer-2 chips.
+  rendered as inline source-typed chips and a doc-wide References appendix.
+- **Masthead & framing.** Set `DocumentModel.project_name` (brand wordmark +
+  colophon), `lede` (the deck), optional `title_accent` (a substring of the title
+  rendered in the accent), `kicker` (≤2 eyebrow spans), and `meta` (label/value
+  pairs). Give each `Section` an optional `strap` (the short eyebrow beside its
+  number) and `subtitle` (its lead line).
 - Callouts: `decision` (a choice + why), `evolution` (one per `EvolutionNote`),
   `unspecified` (one per open question / gap — the fail-closed surface).
 - Diagrams: emit a declarative `DiagramGraph` (nodes/edges + `layout`), each
   node carrying the `source_refs` of the claim it depicts. The renderer lays it
-  out to interactive SVG; you describe *what it means*, not coordinates. Five
-  layouts are available: `pipeline` (L→R sequence), `flow` (top-down decision),
-  `ladder` (ordered rising rungs), `mapping` (two columns, "X → Y"), `panel`
-  (a grid of component/area cards).
+  out to interactive SVG with a per-layout, semantically-appropriate animation
+  (motion fitted to each layout's grammar — never one-size-fits-all); you
+  describe *what it means*, not coordinates. Eight layouts are available:
+  `pipeline` (L→R sequence), `flow` (top-down decision), `ladder` (ordered rising
+  rungs), `mapping` (two columns, "X → Y"), `panel` (a grid of component/area
+  cards), `hub` (a central core with radiating nodes — the first node is the
+  core), `stack` (a layered architecture, built bottom-up), and `timeline` (an
+  evolution, lit in chronological order).
 - **Optional voice profile.** If a `synthesis.voice.md` exists at the project
   root (or `--voice` is supplied), honour it here: it sets *how* prose reads —
   point of view, tone, casing, banned words, domain terminology, number
@@ -162,10 +174,11 @@ fabricated locator, or a missing coverage note). Never edit the gate to pass.
 uv run python skill/scripts/render.py .synthesis/document_model.json [--theme theme.json] --out architecture.html
 ```
 
-Produces the self-contained interactive storybook: the default reference theme,
-the depth control (Overview / Technical / Sources = Layers 0/1/2), scrollspy
-TOC, theme toggle, hand-rendered interactive SVG diagrams, source-typed citation
-chips. A `--theme` JSON of CSS-variable tokens reskins everything (theming is
+Produces the self-contained interactive storybook in the editorial design system
+(renderer v2): a warm light-only theme, per-section disclosure (inline "Technical
+detail" — no global depth toggle), a sticky scrollspy TOC, hand-laid interactive
+SVG diagrams that animate per-layout, source-typed citation chips, and a
+References appendix. A `--theme` JSON of CSS-variable tokens reskins everything (theming is
 cosmetic, downstream of synthesis — it can change how a claim looks, never which
 claims exist). The storybook is **generated, never hand-edited**: to fix a fact,
 fix the source and regenerate.
