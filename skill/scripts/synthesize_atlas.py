@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import adapter_code  # noqa: E402
 import adapter_doc  # noqa: E402
 import adapter_speckit  # noqa: E402
+import discover_links  # noqa: E402
 import render as render_mod  # noqa: E402
 from render import GLYPH, build_css, esc  # noqa: E402
 from schema import DocumentModel, FragmentCorpus, WorkspaceManifest  # noqa: E402
@@ -197,11 +198,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── stage 0: adapt every member (origin-stamped) ───────────────────────
     ready: dict[str, DocumentModel] = {}
+    corpora: dict[str, FragmentCorpus] = {}
     lines: list[str] = []
     for m in manifest.members:
         mw = work / _slug(m.origin)
         mw.mkdir(parents=True, exist_ok=True)
         corpus = build_member_corpus(m, base, mw)
+        corpora[m.origin] = corpus
         (mw / "corpus.json").write_text(corpus.model_dump_json(indent=2), encoding="utf-8")
         (mw / "locators.txt").write_text(
             "\n".join(f"{f.kind:12} {f.id}" for f in corpus.fragments) + "\n", encoding="utf-8")
@@ -210,6 +213,13 @@ def main(argv: list[str] | None = None) -> int:
         if have:
             ready[m.origin] = DocumentModel.model_validate_json(dmp.read_text(encoding="utf-8"))
         lines.append(f"   [{ '✓' if have else ' ' }] {m.origin:14} ({m.role:5} · {len(corpus.fragments)} fragments) → {mw}")
+
+    # cross-repo traceability graph (declared + deterministic shared-identifier edges); the
+    # in-session agent may add evidence-gated prose edges before the finish step (spec 002 Phase D).
+    link_graph = discover_links.build_link_graph(manifest, corpora)
+    (work / "link_graph.json").write_text(link_graph.model_dump_json(indent=2), encoding="utf-8")
+    print(f"synthesize_atlas: link_graph.json — {len(link_graph.edges)} cross-repo edge(s) "
+          "(declared + shared-identifier; prose edges added by the agent).")
 
     missing = [m.origin for m in manifest.members if m.origin not in ready]
 

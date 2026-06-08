@@ -372,6 +372,45 @@ class DocumentModel(BaseModel):
 
 # ───────────────────────── workspace (portal — spec 002) ───────────────────
 
+class LinkRel(str, Enum):
+    """The typed, directional relationship a cross-repo edge asserts (spec 002)."""
+
+    DERIVES_FROM = "derives_from"      # docs/spec derives from upstream intent
+    SPECIFIED_BY = "specified_by"      # a docs claim is specified by a spec
+    IMPLEMENTS = "implements"          # code implements a spec
+    SUPERSEDES = "supersedes"          # one source supersedes another
+    REFERENCES = "references"          # a plain cross-reference
+
+
+class LinkEvidenceKind(str, Enum):
+    """How a cross-repo edge was established (the §5.4 evidence ladder)."""
+
+    DECLARED = "declared"      # written in the manifest — trusted
+    IDENTIFIER = "identifier"  # a shared QUALIFIED identifier (FR-NNN, feature slug) — deterministic
+    PROSE = "prose"            # a literal prose reference found in a source fragment — agent-discovered
+
+
+class LinkEndpoint(BaseModel):
+    """One end of a cross-repo edge: a member origin + a locator that resolves in it."""
+
+    model_config = {"extra": "forbid"}
+
+    origin: str
+    locator: str = Field(..., description="A fragment locator (origin-namespaced) resolvable in the workspace.")
+
+
+class DeclaredLink(BaseModel):
+    """An operator-authored cross-repo edge in the manifest (trusted; member-relative locators)."""
+
+    model_config = {"extra": "forbid"}
+
+    src_origin: str
+    src_locator: str = Field(..., description="Member-relative locator in src_origin (the builder namespaces it).")
+    dst_origin: str
+    dst_locator: str = Field(..., description="Member-relative locator in dst_origin (the builder namespaces it).")
+    rel: LinkRel = LinkRel.REFERENCES
+
+
 class WorkspaceMember(BaseModel):
     """One repo/source federated into a portal workspace (spec 002).
 
@@ -400,7 +439,29 @@ class WorkspaceManifest(BaseModel):
     title: Optional[str] = Field(None, description="Portal / index title.")
     project_name: Optional[str] = Field(None, description="Brand wordmark for the index.")
     members: list[WorkspaceMember] = Field(default_factory=list)
+    links: list[DeclaredLink] = Field(default_factory=list, description="Operator-declared cross-repo edges (trusted).")
     theme: dict[str, str] = Field(default_factory=dict, description="Optional theme-token overrides for the whole portal.")
+
+
+class LinkEdge(BaseModel):
+    """A verified-or-candidate cross-repo edge: typed, directional, evidence-bearing (spec 002)."""
+
+    model_config = {"extra": "forbid"}
+
+    src: LinkEndpoint
+    dst: LinkEndpoint
+    rel: LinkRel
+    evidence_kind: LinkEvidenceKind
+    evidence: str = Field(..., description="The declaration, the shared identifier, or the literal prose quote.")
+
+
+class LinkGraph(BaseModel):
+    """The cross-repo traceability graph — a per-run, diffable build IR (sibling to ArchitectureModel)."""
+
+    model_config = {"extra": "forbid"}
+
+    schema_version: str = SCHEMA_VERSION
+    edges: list[LinkEdge] = Field(default_factory=list)
 
 
 __all__ = [
@@ -413,4 +474,5 @@ __all__ = [
     "DiagramNode", "DiagramEdge", "DiagramGraph",
     "Block", "Section", "MetaPair", "DocumentModel",
     "WorkspaceMember", "WorkspaceManifest",
+    "LinkRel", "LinkEvidenceKind", "LinkEndpoint", "DeclaredLink", "LinkEdge", "LinkGraph",
 ]
