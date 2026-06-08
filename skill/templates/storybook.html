@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  spec-kit-synthesis · STORYBOOK DESIGN SYSTEM — reference skeleton
+  ============================================================================
+  This is the canonical visual contract for the renderer. The renderer (v2)
+  emits THIS structure, populated from a DocumentModel. Open it in a browser
+  to judge the look; read the SLOT comments below to see what each region
+  binds to in the model.
+
+  Provenance: the framework (layout, type, shape, components, interaction) was
+  extracted from an external editorial design system and stripped to a neutral
+  skeleton. It carries NO third-party branding and NO client/domain content —
+  every word below is neutral placeholder describing this project's own
+  component inventory. Theme tokens (the :root palette) remain a retint layer.
+
+  Faithfulness note: the core engine (adapters, verify.py, reconcile) is
+  UNCHANGED by adopting this template. This is purely the render/presentation
+  layer. Citations get a *better* home here: inline `.ref` anchors + a
+  References appendix, which is exactly our SourceRef model.
+  ============================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#f4f0e6">
+<title>Storybook — Design System Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Spline+Sans+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
+
+  /* Pin the light editorial palette so OS / browser dark mode never inverts
+     the paper aesthetic. The design is intentionally a warm light theme.
+     Force an OPAQUE paper fill at every level so an in-app dark webview
+     cannot show through the semi-transparent gradient layers. */
+  :root{ color-scheme: light; }
+  html{ color-scheme: light; background-color:#f4f0e6 !important; }
+  body{ background-color:#f4f0e6 !important; min-height:100vh; }
+
+  /* SLOT: theme tokens — the renderer's --theme dict overrides these. */
+  :root{
+    --ink:#16140f;
+    --paper:#f4f0e6;
+    --paper-2:#ebe5d6;
+    --gold:#a8742a;
+    --gold-bright:#cf9a3c;
+    --red:#9b3022;
+    --green:#3f5d3a;
+    --blue:#2c4a63;
+    --line:#cdc4ad;
+    --line-dk:#b3a98d;
+    --shadow:rgba(40,32,16,.16);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background-color:#f4f0e6;
+    color:var(--ink);
+    font-family:'Newsreader',Georgia,serif;
+    font-size:18px;
+    line-height:1.62;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(168,116,42,.05), transparent 40%),
+      radial-gradient(circle at 88% 92%, rgba(44,74,99,.05), transparent 42%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.06;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");}
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px;position:relative;z-index:2;}
+
+  /* ---------- masthead ---------- */
+  /* ---- brand mark (masthead + nav) — neutral glyph, no third-party logo ---- */
+  .spin-star{transform-box:fill-box;transform-origin:center;transform:rotate(var(--spin,0deg));transition:transform .35s cubic-bezier(.22,.61,.36,1);will-change:transform;}
+  .brand-logo{display:inline-flex;align-items:center;gap:11px;margin-bottom:22px;text-decoration:none;color:var(--ink);}
+  .brand-logo svg{display:block;height:36px;width:auto;}
+  nav.toc .brand-mark{display:flex;align-items:center;flex:0 0 auto;padding-right:16px;margin-right:8px;border-right:1px solid var(--line-dk);text-decoration:none;
+    opacity:0;max-width:0;overflow:hidden;padding-right:0;margin-right:0;border-right-color:transparent;
+    transition:opacity .3s ease,max-width .35s ease,padding-right .35s ease,margin-right .35s ease;}
+  nav.toc .brand-mark.show{opacity:1;max-width:240px;padding-right:16px;margin-right:8px;border-right-color:var(--line-dk);}
+  nav.toc .brand-mark svg{display:block;height:22px;width:auto;}
+  @media(max-width:680px){
+    .brand-logo svg{height:30px;}
+    nav.toc .brand-mark svg{height:19px;}
+    nav.toc .brand-mark{padding-right:11px;margin-right:6px;}
+  }
+  header.mast{border-bottom:3px double var(--ink);padding:40px 0 22px;margin-bottom:8px;}
+  .kicker{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:18px;}
+  h1.title{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(2.4rem,6vw,4.6rem);line-height:.96;letter-spacing:-.02em;}
+  h1.title em{font-style:italic;font-weight:500;color:var(--gold);}
+  .dek{font-size:clamp(1.05rem,2vw,1.32rem);max-width:720px;margin-top:18px;color:#42392a;line-height:1.5;}
+  .meta-row{display:flex;gap:26px;flex-wrap:wrap;margin-top:22px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b513c;}
+  .meta-row b{color:var(--ink);font-weight:600;}
+
+  /* ---------- nav (sticky, responsive) ---------- */
+  nav.toc{position:-webkit-sticky;position:sticky;top:0;z-index:50;
+    background:rgba(244,240,230,.96);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line-dk);box-shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 6px 18px -12px var(--shadow);
+    padding:10px 0;margin-bottom:46px;}
+  nav.toc .wrap{display:flex;gap:5px;align-items:center;}
+  /* desktop: links in a single non-wrapping row that scrolls horizontally if tight */
+  nav.toc .links{display:flex;gap:4px;align-items:center;flex:1;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
+  nav.toc .links::-webkit-scrollbar{display:none;}
+  nav.toc a{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#5b513c;text-decoration:none;padding:6px 10px;border:1px solid transparent;border-radius:3px;transition:all .18s;white-space:nowrap;flex:0 0 auto;}
+  nav.toc a:hover,nav.toc a:focus-visible{color:var(--ink);border-color:var(--line-dk);background:var(--paper-2);outline:none;}
+  nav.toc a.active{color:var(--gold);border-color:var(--gold);background:rgba(168,116,42,.08);font-weight:600;}
+  nav.toc a.active:hover{color:var(--gold);}
+  /* the mobile menu toggle — hidden on desktop */
+  nav.toc .navbtn{display:none;align-items:center;gap:9px;width:100%;background:none;border:none;cursor:pointer;
+    font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);padding:4px 2px;}
+  nav.toc .navbtn .lbl{flex:1;text-align:left;color:#5b513c;}
+  nav.toc .navbtn .cur{color:var(--ink);font-weight:600;}
+  nav.toc .navbtn .bars{display:inline-flex;flex-direction:column;gap:3px;width:20px;}
+  nav.toc .navbtn .bars span{height:2px;background:var(--ink);border-radius:2px;transition:transform .25s,opacity .2s;}
+  nav.toc.open .navbtn .bars span:nth-child(1){transform:translateY(5px) rotate(45deg);}
+  nav.toc.open .navbtn .bars span:nth-child(2){opacity:0;}
+  nav.toc.open .navbtn .bars span:nth-child(3){transform:translateY(-5px) rotate(-45deg);}
+
+  section{margin-bottom:64px;scroll-margin-top:64px;}
+  .sec-num{font-family:'Spline Sans Mono',monospace;font-size:12px;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;}
+  h2{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(1.9rem,4vw,3rem);line-height:1.04;letter-spacing:-.015em;margin:6px 0 8px;}
+  h3{font-family:'Fraunces',serif;font-weight:600;font-size:1.45rem;margin:34px 0 12px;letter-spacing:-.01em;}
+  h4{font-family:'Spline Sans Mono',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:24px 0 8px;}
+  p{margin-bottom:16px;max-width:74ch;}
+  p.lead{font-size:1.22rem;line-height:1.5;color:#2e2a20;}
+  a.ref{color:var(--blue);text-decoration:none;border-bottom:1px solid rgba(44,74,99,.35);}
+  a.ref:hover{border-bottom-color:var(--blue);}
+  .divider{border:none;border-top:1px solid var(--line);margin:48px 0;}
+  .rule-thin{border:none;border-top:1px solid var(--line);margin:26px 0;}
+  strong{font-weight:600;color:#16140f;}
+  em.term{font-style:italic;color:var(--gold);font-weight:500;}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:34px;}
+  @media(max-width:780px){.twocol{grid-template-columns:1fr;gap:8px;}}
+
+  /* ---------- callouts ---------- */
+  .pull{border-left:3px solid var(--gold);padding:6px 0 6px 22px;margin:30px 0;font-family:'Fraunces',serif;font-style:italic;font-size:1.5rem;line-height:1.32;color:#2e2a20;}
+  .note{background:var(--paper-2);border:1px solid var(--line-dk);border-radius:4px;padding:18px 22px;margin:24px 0;font-size:.96rem;line-height:1.55;}
+  .note .tag{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:6px;}
+  .flag{border-left:3px solid var(--red);}
+  .flag .tag{color:var(--red);}
+  .flag-ok{border-left:3px solid var(--green);}
+  .flag-ok .tag{color:var(--green);}
+
+  /* ---------- tables ---------- */
+  .tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:.93rem;}
+  .tbl th{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;text-align:left;padding:10px 12px;border-bottom:2px solid var(--ink);color:#42392a;vertical-align:bottom;}
+  .tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.42;}
+  .tbl tr:hover td{background:rgba(168,116,42,.05);}
+  .tbl .mono{font-family:'Spline Sans Mono',monospace;font-size:.82rem;}
+  .pill{display:inline-block;font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:10px;font-weight:600;}
+  /* SLOT: coverage-status pills — mapped to CoverageStatus in the model. */
+  .pill.build{background:#d8e4d2;color:#2f4628;}   /* spec_backed   */
+  .pill.buy{background:#f0dccb;color:#7a4316;}      /* specced_only  */
+  .pill.hybrid{background:#d9e2ea;color:#274056;}   /* implemented_only */
+  .pill.hard{background:#efd0c9;color:#7c2618;}     /* unknown / risk */
+  .pill.med{background:#efe3c4;color:#6e5413;}
+  .pill.easy{background:#dce8d6;color:#37502f;}
+
+  /* ---------- disclosure module (per-section accordion) ---------- */
+  .mod{border:1px solid var(--line-dk);border-radius:5px;margin-bottom:12px;overflow:hidden;background:rgba(255,253,247,.5);transition:box-shadow .2s;}
+  .mod[open]{box-shadow:0 8px 30px var(--shadow);}
+  .mod summary{cursor:pointer;list-style:none;padding:18px 22px;display:flex;align-items:center;gap:18px;transition:background .18s;}
+  .mod summary::-webkit-details-marker{display:none;}
+  .mod summary:hover{background:var(--paper-2);}
+  .mod .mn{font-family:'Fraunces',serif;font-weight:900;font-size:1.7rem;color:var(--gold);min-width:42px;}
+  .mod .mt{font-family:'Fraunces',serif;font-weight:600;font-size:1.16rem;flex:1;letter-spacing:-.01em;}
+  .mod .mx{font-family:'Spline Sans Mono',monospace;font-size:20px;color:var(--gold);transition:transform .25s;}
+  .mod[open] .mx{transform:rotate(45deg);}
+  .mod .body{padding:4px 24px 24px;border-top:1px solid var(--line);}
+  .mod .body p{font-size:.97rem;}
+  .what{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7d705a;margin:16px 0 4px;}
+
+  /* ---------- diagram frames ---------- */
+  figure{margin:34px 0;border:1px solid var(--line-dk);border-radius:6px;background:#fbf9f2;padding:8px;box-shadow:0 4px 20px var(--shadow);overflow:hidden;}
+  figure svg{display:block;width:100%;height:auto;}
+  figcaption{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.06em;color:#6b5f48;padding:10px 14px 6px;border-top:1px solid var(--line);margin-top:8px;text-transform:uppercase;}
+  figcaption b{color:var(--ink);}
+
+  /* svg helpers */
+  .svg-label{font-family:'Spline Sans Mono',monospace;font-weight:500;}
+  .svg-title{font-family:'Fraunces',serif;font-weight:600;}
+  /* ============================================================
+     ANIMATION — per-diagram motion fitted to each diagram's grammar.
+     All settle to a correct final state (print/PDF safe).
+     Hard-disabled under prefers-reduced-motion (guard at end of <style>).
+     Two diagrams (timeline, roadmap) are scroll-SCRUBBED via --p (0..1),
+     set by JS from scroll position — no scroll-locking, reader stays in control.
+     ============================================================ */
+
+  /* base scroll-reveal: every figure rises + fades in once */
+  figure{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s cubic-bezier(.22,.61,.36,1);}
+  figure.in{opacity:1;transform:none;}
+
+  /* ---- shared keyframes ---- */
+  @keyframes partIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes growX{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+  @keyframes growY{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+  @keyframes popIn{0%{opacity:0;transform:scale(.4);}60%{transform:scale(1.15);}100%{opacity:1;transform:scale(1);}}
+  @keyframes drawIn{to{stroke-dashoffset:0;}}
+  @keyframes sweep{from{transform:rotate(-90deg);opacity:0;}40%{opacity:1;}to{transform:rotate(0);opacity:1;}}
+
+  /* TIMELINE — travels left→right, nodes light in date order (scroll-scrubbed). */
+  .fig-timeline svg .tl-line{stroke-dasharray:880;stroke-dashoffset:calc(880 - 880 * var(--p,0));}
+  .fig-timeline svg .tl-node{opacity:0;transform:scale(.4);transform-box:fill-box;transform-origin:center;transition:opacity .25s,transform .25s;}
+  .fig-timeline svg .tl-node.lit{opacity:1;transform:scale(1);}
+  .fig-timeline.in:not(.scrubbed) svg .tl-line{stroke-dashoffset:0;transition:stroke-dashoffset 1s ease;}
+  .fig-timeline.in:not(.scrubbed) svg .tl-node{opacity:1;transform:scale(1);}
+
+  /* HUB — radiates: hub first, spokes grow out, ring sweeps last. */
+  .fig-hub.in svg .hub-core{opacity:0;animation:popIn .5s cubic-bezier(.22,.61,.36,1) .05s forwards;transform-box:fill-box;transform-origin:center;}
+  .fig-hub.in svg .hub-spoke{stroke-dasharray:420;stroke-dashoffset:420;animation:drawIn .45s ease forwards;}
+  .fig-hub.in svg .hub-spoke:nth-of-type(1){animation-delay:.3s;}
+  .fig-hub.in svg .hub-spoke:nth-of-type(2){animation-delay:.37s;}
+  .fig-hub.in svg .hub-spoke:nth-of-type(3){animation-delay:.44s;}
+  .fig-hub.in svg .hub-spoke:nth-of-type(4){animation-delay:.51s;}
+  .fig-hub.in svg .hub-spoke:nth-of-type(5){animation-delay:.58s;}
+  .fig-hub.in svg .hub-node{opacity:0;animation:partIn .4s ease forwards;}
+  .fig-hub.in svg .hub-node:nth-of-type(1){animation-delay:.45s;}
+  .fig-hub.in svg .hub-node:nth-of-type(2){animation-delay:.52s;}
+  .fig-hub.in svg .hub-node:nth-of-type(3){animation-delay:.59s;}
+  .fig-hub.in svg .hub-node:nth-of-type(4){animation-delay:.66s;}
+  .fig-hub.in svg .hub-node:nth-of-type(5){animation-delay:.73s;}
+  .fig-hub.in svg .hub-ring{opacity:0;transform-box:fill-box;transform-origin:center;animation:sweep .7s cubic-bezier(.4,0,.2,1) .8s forwards;}
+  .fig-hub.in svg .hub-ringlabel{opacity:0;animation:partIn .4s ease 1.2s forwards;}
+
+  /* ARCHITECTURE — builds as a STACK, layer by layer. */
+  .fig-stack.in svg .stack-layer{opacity:0;transform:translateY(14px);animation:layerIn .55s cubic-bezier(.22,.61,.36,1) forwards;}
+  @keyframes layerIn{to{opacity:1;transform:none;}}
+  .fig-stack.in svg .stack-layer:nth-of-type(1){animation-delay:.1s;}
+  .fig-stack.in svg .stack-layer:nth-of-type(2){animation-delay:.22s;}
+  .fig-stack.in svg .stack-layer:nth-of-type(3){animation-delay:.34s;}
+  .fig-stack.in svg .stack-layer:nth-of-type(4){animation-delay:.46s;}
+  .fig-stack.in svg .stack-layer:nth-of-type(5){animation-delay:.58s;}
+
+  /* ---------- source cards (provenance grid) ---------- */
+  .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin:24px 0;}
+  .vcard{border:1px solid var(--line-dk);border-radius:5px;padding:18px 20px;background:rgba(255,253,247,.55);transition:transform .18s,box-shadow .18s;}
+  .vcard:hover{transform:translateY(-3px);box-shadow:0 10px 28px var(--shadow);}
+  .vcard .vh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;}
+  .vcard .vn{font-family:'Fraunces',serif;font-weight:600;font-size:1.2rem;}
+  .vcard .vloc{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.04em;color:var(--gold);text-transform:uppercase;white-space:nowrap;}
+  .vcard p{font-size:.9rem;line-height:1.46;margin-bottom:10px;color:#3a3324;}
+  .vcard a.ref{font-family:'Spline Sans Mono',monospace;font-size:11px;}
+
+  /* ---------- footer ---------- */
+  footer{border-top:3px double var(--ink);margin-top:30px;padding:30px 0 70px;font-size:.86rem;color:#5b513c;}
+  footer .reflist{columns:2;column-gap:40px;font-size:.8rem;line-height:1.5;margin-top:16px;}
+  @media(max-width:680px){footer .reflist{columns:1;}}
+  footer .reflist a{color:var(--blue);text-decoration:none;word-break:break-word;}
+  .colophon{width:100%;border-collapse:collapse;margin-top:22px;font-family:'Spline Sans Mono',monospace;font-size:11px;background:var(--paper-2);border:1px solid var(--line-dk);border-radius:5px;overflow:hidden;}
+  .colophon th,.colophon td{text-align:left;padding:9px 16px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5;}
+  .colophon tbody tr:last-child th,.colophon tbody tr:last-child td{border-bottom:none;}
+  .colophon tbody th{width:120px;white-space:nowrap;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:600;background:rgba(168,116,42,.06);border-right:1px solid var(--line);}
+  .colophon td{color:#3a3324;}
+  .colophon td strong{color:var(--ink);font-weight:600;}
+  .vtag{display:inline-block;background:var(--ink);color:var(--paper);padding:2px 9px;border-radius:10px;font-size:10px;letter-spacing:.06em;font-weight:600;}
+  .genline{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);font-family:'Spline Sans Mono',monospace;font-size:10px;line-height:1.7;letter-spacing:.04em;color:#7d705a;max-width:none;text-transform:uppercase;}
+  .genline .gm{color:var(--green);margin-right:6px;}
+  .genline a{color:var(--blue);text-decoration:none;border-bottom:1px solid rgba(44,74,99,.4);}
+  .genline a:hover{border-bottom-color:var(--blue);}
+
+  ul.clean{list-style:none;margin:12px 0;}
+  ul.clean li{padding:5px 0 5px 22px;position:relative;font-size:.97rem;line-height:1.45;}
+  ul.clean li::before{content:"→";position:absolute;left:0;color:var(--gold);font-family:'Spline Sans Mono',monospace;}
+  ol.steps{margin:14px 0 14px 4px;counter-reset:s;list-style:none;}
+  ol.steps li{counter-increment:s;padding:8px 0 8px 40px;position:relative;border-bottom:1px dotted var(--line);font-size:.96rem;}
+  ol.steps li::before{content:counter(s,decimal-leading-zero);position:absolute;left:0;top:8px;font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--gold);font-weight:600;}
+
+  .anchor{display:block;position:relative;top:-64px;visibility:hidden;}
+
+  /* ============================================================ RESPONSIVE — tablet */
+  @media(max-width:900px){
+    body{font-size:17px;}
+    .wrap{padding:0 22px;}
+    .vgrid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+  }
+  /* ============================================================ RESPONSIVE — mobile */
+  @media(max-width:680px){
+    body{font-size:16px;line-height:1.58;}
+    .wrap{padding:0 18px;}
+    header.mast{padding:28px 0 18px;}
+    .kicker{font-size:9.5px;letter-spacing:.2em;}
+    .dek{font-size:1.06rem;}
+    .meta-row{gap:14px 20px;font-size:10px;}
+    section{margin-bottom:48px;scroll-margin-top:60px;}
+    h2{font-size:1.7rem;}
+    h3{font-size:1.25rem;}
+    p,p.lead{max-width:none;}
+    p.lead{font-size:1.1rem;}
+    .pull{font-size:1.22rem;padding-left:16px;margin:24px 0;}
+    .note{padding:15px 16px;}
+    nav.toc{padding:0;margin-bottom:34px;}
+    nav.toc .wrap{padding-top:0;padding-bottom:0;}
+    nav.toc .navbtn{display:flex;padding:13px 0;flex:1;}
+    nav.toc .links{
+      position:absolute;left:0;right:0;top:100%;
+      flex-direction:column;align-items:stretch;gap:0;
+      background:var(--paper);border-bottom:1px solid var(--line-dk);
+      box-shadow:0 14px 24px -10px var(--shadow);
+      max-height:0;overflow:hidden;
+      transition:max-height .32s ease;
+      padding:0 18px;
+    }
+    nav.toc.open .links{max-height:80vh;overflow-y:auto;padding:6px 18px 12px;}
+    nav.toc .links a{font-size:12px;padding:11px 6px;border:none;border-bottom:1px solid var(--line);border-radius:0;white-space:normal;}
+    nav.toc .links a:last-child{border-bottom:none;}
+    nav.toc .links a:hover,nav.toc .links a:focus-visible{background:var(--paper-2);}
+    .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:20px -18px;padding:0 18px;}
+    .tbl{min-width:520px;font-size:.86rem;}
+    .tbl th,.tbl td{padding:9px 10px;}
+    .mod summary{padding:14px 16px;gap:12px;}
+    .mod .mn{font-size:1.4rem;min-width:32px;}
+    .mod .mt{font-size:1.02rem;}
+    .mod .body{padding:4px 16px 18px;}
+    figure{margin:24px -4px;}
+    figcaption{font-size:10px;padding:9px 12px 6px;}
+    .colophon{font-size:10px;}
+    .colophon th,.colophon td{padding:8px 11px;}
+    .colophon tbody th{width:96px;}
+  }
+  @media(max-width:400px){
+    nav.toc .navbtn .lbl{font-size:10px;}
+    h1.title{font-size:2.1rem;}
+  }
+
+  /* respect reduced-motion — force every animated element to its final state */
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
+    figure{opacity:1!important;transform:none!important;}
+    figure svg *{opacity:1!important;transform:none!important;}
+    .tl-line{stroke-dashoffset:0!important;}
+    .hub-spoke{stroke-dashoffset:0!important;}
+    .tl-node{opacity:1!important;transform:none!important;}
+    .spin-star{transform:none!important;}
+  }
+  /* print — force all diagrams fully drawn (scrubbed ones default hidden) */
+  @media print{
+    figure{opacity:1!important;transform:none!important;break-inside:avoid;}
+    figure svg *{opacity:1!important;transform:none!important;}
+    .tl-line,.hub-spoke{stroke-dashoffset:0!important;}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="wrap">
+
+<!-- ============ SLOT: masthead — DocumentModel.title / dek / project meta ============ -->
+<header class="mast">
+  <a href="#summary" class="brand-logo" aria-label="synthesis">
+    <!-- SLOT: brand mark — neutral glyph (renderer injects project mark or this default). -->
+    <svg viewBox="0 0 168 40" role="img" aria-label="synthesis" xmlns="http://www.w3.org/2000/svg">
+      <g class="spin-star">
+        <g transform="translate(18,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round">
+          <line x1="-13" y1="0" x2="13" y2="0"/>
+          <line x1="0" y1="-13" x2="0" y2="13"/>
+          <line x1="-9.2" y1="-9.2" x2="9.2" y2="9.2"/>
+          <line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/>
+        </g>
+      </g>
+      <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">synthesis</text>
+    </svg>
+  </a>
+  <div class="kicker">
+    <span>Architecture Storybook</span>     <!-- SLOT: kicker.left  — doc kind -->
+    <span>Synthesised from N sources</span>  <!-- SLOT: kicker.right — source summary -->
+  </div>
+  <h1 class="title">The Storybook <em>Design System</em></h1> <!-- SLOT: title (+ em accent) -->
+  <p class="dek">A reference rendering of every component the synthesis renderer can emit — type, callouts, tables, disclosure, diagrams, and source-typed citations. Neutral placeholder content; zero client data.</p> <!-- SLOT: dek -->
+  <div class="meta-row"> <!-- SLOT: meta-row — project metadata pairs -->
+    <span><b>Project</b> example-system</span>
+    <span><b>Sources</b> spec · code · design-doc</span>
+    <span><b>Coverage</b> reconciled</span>
+    <span><b>Build</b> deterministic</span>
+  </div>
+</header>
+</div>
+
+<!-- ============ SLOT: sticky nav — one anchor per Section ============ -->
+<nav class="toc" id="toc">
+  <div class="wrap">
+    <a href="#summary" class="brand-mark" aria-label="synthesis">
+      <svg viewBox="0 0 168 40" role="img" aria-label="synthesis" xmlns="http://www.w3.org/2000/svg">
+        <g class="spin-star">
+          <g transform="translate(18,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round">
+            <line x1="-13" y1="0" x2="13" y2="0"/>
+            <line x1="0" y1="-13" x2="0" y2="13"/>
+            <line x1="-9.2" y1="-9.2" x2="9.2" y2="9.2"/>
+            <line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/>
+          </g>
+        </g>
+        <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">synthesis</text>
+      </svg>
+    </a>
+    <button class="navbtn" id="navbtn" aria-expanded="false" aria-controls="toclinks">
+      <span class="bars"><span></span><span></span><span></span></span>
+      <span class="lbl">Contents · <span class="cur" id="navcur">Overview</span></span>
+    </button>
+    <div class="links" id="toclinks">
+      <a href="#summary">Overview</a>
+      <a href="#type">Type &amp; Rhythm</a>
+      <a href="#callouts">Callouts</a>
+      <a href="#tables">Tables &amp; Coverage</a>
+      <a href="#disclosure">Disclosure</a>
+      <a href="#diagrams">Diagrams</a>
+      <a href="#sources">Source Cards</a>
+      <a href="#refs">References</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ SLOT: Section (prose + lead + callout + pull) ============ -->
+<section id="summary">
+  <span class="anchor"></span>
+  <span class="sec-num">01 — The picture in one read</span> <!-- SLOT: sec-num — "NN — strap" -->
+  <h2>What the storybook is</h2>                              <!-- SLOT: Section.title -->
+  <p class="lead">A storybook is one faithful, whole-system architecture narrative reconciled from many sources. It is organised by architecture, never by authoring history — and every claim it makes is traceable to where it came from.</p>
+  <p>This page is not that narrative; it is the <strong>design system</strong> that renders it. Each section below exercises one family of components so the visual language can be judged in isolation. The reading model is progressive: the prose stands on its own, and detail is revealed in place rather than behind a mode switch.</p>
+
+  <!-- SLOT: callout (CalloutKind → variant). flag-ok = settled/decision, flag = unspecified/risk, plain = evolution/note. -->
+  <div class="note flag-ok">
+    <span class="tag">The structural fact</span>
+    The renderer is a pure function of the model: same model in, byte-identical HTML out. That makes every run diffable and the faithfulness gate auditable. See <a href="#diagrams" class="ref">§06</a>.
+  </div>
+
+  <p class="pull">"Organised by architecture, not by spec history — and never a claim without a source."</p> <!-- SLOT: pull-quote (optional) -->
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (type ramp + lists) ============ -->
+<section id="type">
+  <span class="anchor"></span>
+  <span class="sec-num">02 — The voice</span>
+  <h2>Type &amp; rhythm</h2>
+  <p class="lead">Display in Fraunces, body in Newsreader, labels and code in Spline Sans Mono. A warm paper ground, generous leading, a single accent for emphasis.</p>
+  <h3>A subheading, set in Fraunces</h3>
+  <p>Body copy is a reading serif at a comfortable measure. Inline emphasis uses <strong>weight</strong> and the <em class="term">accent term</em> treatment sparingly. Citations appear as quiet inline anchors such as <a href="#refs" class="ref">a reference</a> that resolve to the appendix.</p>
+  <h4>A mono eyebrow label</h4>
+  <ul class="clean">
+    <li>Arrow-led lists carry parallel facts without numbering.</li>
+    <li>The accent glyph keeps the eye on the left margin.</li>
+    <li>Each item is one self-contained claim.</li>
+  </ul>
+  <ol class="steps">
+    <li>Numbered steps imply sequence and dependency.</li>
+    <li>Leading-zero counters keep the rhythm monospaced.</li>
+    <li>Dotted rules separate without shouting.</li>
+  </ol>
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (callout variants) ============ -->
+<section id="callouts">
+  <span class="anchor"></span>
+  <span class="sec-num">03 — Marked passages</span>
+  <h2>Callouts &amp; citations</h2>
+  <p>Three callout variants carry the three things a faithful synthesis must mark out: a settled decision, an unspecified gap, and an evolution in the record.</p>
+  <div class="note flag-ok"><span class="tag">Decision</span>A resolved architectural choice. Green left-rule. Maps to <span class="mono">CalloutKind.decision</span>; the body cites the source that settled it.</div>
+  <div class="note flag"><span class="tag">Unspecified</span>A genuine gap — something the sources do not pin down. Red left-rule. Maps to <span class="mono">CalloutKind.unspecified</span>; the gate requires the body be non-empty.</div>
+  <div class="note"><span class="tag">Evolution</span>A superseded position kept for the record. Neutral rule. Maps to <span class="mono">CalloutKind.evolution</span>; cites the history entry, not the demoted claim.</div>
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (table + coverage pills) ============ -->
+<section id="tables">
+  <span class="anchor"></span>
+  <span class="sec-num">04 — The honesty axis</span>
+  <h2>Tables &amp; coverage</h2>
+  <p>The coverage matrix reconciles intent against reality. Each row is a subsystem; the pill states how spec and code line up.</p>
+  <div class="tbl-scroll">
+    <table class="tbl">
+      <thead><tr><th>Subsystem</th><th>What it does</th><th>Coverage</th></tr></thead>
+      <tbody>
+        <tr><td>Adapters</td><td>Turn each source into uniform fragments</td><td><span class="pill build">Spec-backed</span></td></tr>
+        <tr><td>Reconcile</td><td>Merge overlaps, demote supersessions</td><td><span class="pill build">Spec-backed</span></td></tr>
+        <tr><td>Theme detect</td><td>Read host tokens into a palette</td><td><span class="pill buy">Specced only</span></td></tr>
+        <tr><td>Coverage view</td><td>Intent-vs-reality matrix</td><td><span class="pill hybrid">Implemented only</span></td></tr>
+        <tr><td>Voice profile</td><td>House narration convention</td><td><span class="pill hard">Unknown</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (per-section disclosure accordion) ============ -->
+<section id="disclosure">
+  <span class="anchor"></span>
+  <span class="sec-num">05 — Depth in place</span>
+  <h2>Disclosure</h2>
+  <p>Detail opens where it lives, not behind a global mode. Tap a row to expand; deep-links open the targeted row automatically. Press <span class="mono">e</span> to expand all, <span class="mono">c</span> to collapse.</p>
+
+  <details class="mod">
+    <summary><span class="mn">1</span><span class="mt">The map phase — extract</span><span class="pill easy">Read</span><span class="mx">+</span></summary>
+    <div class="body">
+      <p>Each source fragment is read into typed claims, every one carrying at least one source reference. Fan out one reader per feature folder at scale.</p>
+      <div class="what">It reads, then types, then grounds</div>
+      <ul class="clean">
+        <li>Heading-split fragments become candidate claims.</li>
+        <li>Every claim carries a typed source reference.</li>
+        <li>A claim with no source cannot be constructed.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="mod">
+    <summary><span class="mn">2</span><span class="mt">The reduce phase — reconcile</span><span class="pill med">Reason</span><span class="mx">+</span></summary>
+    <div class="body">
+      <p>The product of the whole pipeline: overlapping claims merge, contradictions resolve to a current position, and superseded ones drop to history.</p>
+      <div class="note flag-ok"><span class="tag">Where the value is</span>Reconcile is the editorial act — choosing the architecture spine. It stays grounded by pulling sources from the claims it keeps.</div>
+    </div>
+  </details>
+
+  <details class="mod">
+    <summary><span class="mn">3</span><span class="mt">The gate — verify</span><span class="pill hard">Fail-closed</span><span class="mx">+</span></summary>
+    <div class="body">
+      <p>Six checks run before anything renders. Exit zero only if provenance resolves, blocks are grounded, callouts have bodies, and the coverage note is present.</p>
+    </div>
+  </details>
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (diagrams — hand-laid SVG, restyled) ============ -->
+<section id="diagrams">
+  <span class="anchor"></span>
+  <span class="sec-num">06 — Seeing the shape</span>
+  <h2>Diagrams</h2>
+  <p>Diagrams are hand-laid SVG in the system's own visual language — gradient strokes, mono labels, scroll-revealed. Three of the layout families are shown.</p>
+
+  <!-- HUB — source-agnostic core with adapters radiating in. -->
+  <figure class="fig-hub">
+    <svg viewBox="0 0 760 300" role="img" aria-label="Source-agnostic core">
+      <text x="30" y="34" class="svg-title" font-size="18" fill="#16140f">Adapters feed one source-agnostic core</text>
+      <g stroke="var(--gold)" stroke-width="2" fill="none">
+        <line class="hub-spoke" x1="380" y1="170" x2="160" y2="110"/>
+        <line class="hub-spoke" x1="380" y1="170" x2="160" y2="230"/>
+        <line class="hub-spoke" x1="380" y1="170" x2="600" y2="110"/>
+        <line class="hub-spoke" x1="380" y1="170" x2="600" y2="230"/>
+        <line class="hub-spoke" x1="380" y1="170" x2="380" y2="280"/>
+      </g>
+      <g font-family="'Spline Sans Mono',monospace" font-size="12" fill="#16140f" text-anchor="middle">
+        <g class="hub-node"><rect x="96" y="92" width="128" height="34" rx="5" fill="#ebe5d6" stroke="var(--line-dk)"/><text x="160" y="114">spec adapter</text></g>
+        <g class="hub-node"><rect x="96" y="212" width="128" height="34" rx="5" fill="#ebe5d6" stroke="var(--line-dk)"/><text x="160" y="234">code adapter</text></g>
+        <g class="hub-node"><rect x="536" y="92" width="128" height="34" rx="5" fill="#ebe5d6" stroke="var(--line-dk)"/><text x="600" y="114">design-doc</text></g>
+        <g class="hub-node"><rect x="536" y="212" width="128" height="34" rx="5" fill="#ebe5d6" stroke="var(--line-dk)"/><text x="600" y="234">next source</text></g>
+        <g class="hub-node"><rect x="316" y="263" width="128" height="34" rx="5" fill="#ebe5d6" stroke="var(--line-dk)"/><text x="380" y="285">corpus</text></g>
+      </g>
+      <circle class="hub-core" cx="380" cy="170" r="44" fill="#2c4a63"/>
+      <text class="hub-core" x="380" y="166" text-anchor="middle" font-family="'Fraunces',serif" font-weight="900" font-size="15" fill="#f4f0e6">core</text>
+      <text class="hub-core" x="380" y="183" text-anchor="middle" font-family="'Spline Sans Mono',monospace" font-size="9" fill="#cdc4ad">source-blind</text>
+    </svg>
+    <figcaption><b>Fig. 1</b> — Hub layout. The core never knows what a "spec" is.</figcaption>
+  </figure>
+
+  <!-- ARCH — the three-layer stack. -->
+  <figure class="fig-stack">
+    <svg viewBox="0 0 760 230" role="img" aria-label="Three-layer stack">
+      <text x="30" y="32" class="svg-title" font-size="18" fill="#16140f">Three layers, built bottom-up</text>
+      <g font-family="'Spline Sans Mono',monospace" font-size="13" text-anchor="middle">
+        <g class="stack-layer"><rect x="120" y="56" width="520" height="44" rx="6" fill="#d9e2ea" stroke="var(--line-dk)"/><text x="380" y="83" fill="#274056">render — model → one self-contained HTML file</text></g>
+        <g class="stack-layer"><rect x="120" y="112" width="520" height="44" rx="6" fill="#dce8d6" stroke="var(--line-dk)"/><text x="380" y="139" fill="#37502f">core — extract · reconcile · compose · verify</text></g>
+        <g class="stack-layer"><rect x="120" y="168" width="520" height="44" rx="6" fill="#f0dccb" stroke="var(--line-dk)"/><text x="380" y="195" fill="#7a4316">adapters — spec · code · design-doc → corpus</text></g>
+      </g>
+    </svg>
+    <figcaption><b>Fig. 2</b> — Architecture stack. Each layer depends only on the one below.</figcaption>
+  </figure>
+
+  <!-- TIMELINE — evolution, scroll-scrubbed. -->
+  <figure class="fig-timeline">
+    <svg viewBox="0 0 1000 200" role="img" aria-label="Evolution timeline">
+      <defs>
+        <linearGradient id="tl" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#9b3022"/>
+          <stop offset="0.6" stop-color="#a8742a"/>
+          <stop offset="1" stop-color="#3f5d3a"/>
+        </linearGradient>
+      </defs>
+      <text x="40" y="34" class="svg-title" font-size="18" fill="#16140f">How a position evolves in the record</text>
+      <line class="tl-line" x1="80" y1="110" x2="920" y2="110" stroke="url(#tl)" stroke-width="5"/>
+      <g font-family="'Spline Sans Mono',monospace">
+        <g class="tl-node" data-at="0.10"><circle cx="160" cy="110" r="8" fill="#9b3022"/><text x="160" y="92" text-anchor="middle" font-size="12" fill="#16140f" font-weight="600">draft</text><text x="160" y="146" text-anchor="middle" font-size="11" fill="#5b513c">first claim</text></g>
+        <g class="tl-node" data-at="0.45"><circle cx="500" cy="110" r="7" fill="#a8742a"/><text x="500" y="92" text-anchor="middle" font-size="12" fill="#16140f" font-weight="600">revised</text><text x="500" y="146" text-anchor="middle" font-size="11" fill="#5b513c">superseded</text></g>
+        <g class="tl-node" data-at="0.80"><circle cx="840" cy="110" r="9" fill="#3f5d3a"/><text x="840" y="92" text-anchor="middle" font-size="12" fill="#16140f" font-weight="600">current</text><text x="840" y="146" text-anchor="middle" font-size="11" fill="#5b513c">in narrative</text></g>
+      </g>
+    </svg>
+    <figcaption><b>Fig. 3</b> — Timeline. Superseded positions move to history; only "current" is narrated.</figcaption>
+  </figure>
+</section>
+
+<hr class="divider">
+
+<!-- ============ SLOT: Section (source cards — provenance grid) ============ -->
+<section id="sources">
+  <span class="anchor"></span>
+  <span class="sec-num">07 — Where it came from</span>
+  <h2>Source cards</h2>
+  <p>Every source the synthesis read, typed and located. These cards are the human face of the provenance the gate enforces.</p>
+  <div class="vgrid">
+    <div class="vcard">
+      <div class="vh"><span class="vn">Feature spec</span><span class="vloc">spec</span></div>
+      <p>Heading-split specification fragments. The intent layer — what the system is meant to do.</p>
+      <a href="#refs" class="ref">§ overview</a>
+    </div>
+    <div class="vcard">
+      <div class="vh"><span class="vn">Module</span><span class="vloc">code</span></div>
+      <p>File and symbol fragments from the source tree. The reality layer — what is actually built.</p>
+      <a href="#refs" class="ref">§ core</a>
+    </div>
+    <div class="vcard">
+      <div class="vh"><span class="vn">Design note</span><span class="vloc">design-doc</span></div>
+      <p>ADRs and design documents. The rationale layer — why a choice was made.</p>
+      <a href="#refs" class="ref">§ decisions</a>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- ============ SLOT: footer — References appendix + colophon ============ -->
+<div class="wrap">
+<footer id="refs">
+  <span class="anchor"></span>
+  <span class="sec-num">Appendix</span>
+  <h3 style="margin-top:6px">References &amp; build</h3>
+  <p style="font-size:.86rem;max-width:74ch">Every source consulted, resolvable to its locator. This is the resolved form of the model's source references — the same data the fail-closed gate checks.</p>
+
+  <div class="reflist"> <!-- SLOT: reference list — one entry per resolved SourceRef -->
+    <p>Feature specification — overview &amp; goals:<br><a href="#summary">spec · overview</a></p>
+    <p>Feature specification — reconcile rules:<br><a href="#disclosure">spec · reconcile</a></p>
+    <p>Source module — adapter layer:<br><a href="#diagrams">code · adapters</a></p>
+    <p>Source module — core pipeline:<br><a href="#diagrams">code · core</a></p>
+    <p>Design note — architecture decision:<br><a href="#callouts">design-doc · decision</a></p>
+    <p>Design note — coverage model:<br><a href="#tables">design-doc · coverage</a></p>
+  </div>
+
+  <table class="colophon"> <!-- SLOT: colophon — build metadata -->
+    <tbody>
+      <tr><th>Document</th><td>Architecture Storybook — example-system</td></tr>
+      <tr><th>Build</th><td><span class="vtag">deterministic</span></td></tr>
+      <tr><th>Sources</th><td>spec · code · design-doc</td></tr>
+      <tr><th>Gate</th><td>fail-closed · 6 checks</td></tr>
+      <tr><th>Status</th><td>Design-system reference skeleton</td></tr>
+    </tbody>
+  </table>
+
+  <div class="genline">
+    <span class="gm">●</span> Generated by <a href="https://github.com/ashbrener/spec-kit-synthesis" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a> — a faithful synthesis of many sources into one architecture narrative. Organised by architecture, not authoring history. Every claim is traceable to its source.
+  </div>
+</footer>
+</div>
+
+<script>
+  (function(){
+    var nav   = document.getElementById('toc');
+    var btn   = document.getElementById('navbtn');
+    var links = document.getElementById('toclinks');
+    var curEl = document.getElementById('navcur');
+    var anchors = Array.prototype.slice.call(links.querySelectorAll('a'));
+
+    // ---- mobile hamburger toggle ----
+    function setOpen(open){
+      nav.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function(){ setOpen(!nav.classList.contains('open')); });
+    anchors.forEach(function(a){
+      a.addEventListener('click', function(){ curEl.textContent = a.textContent; setOpen(false); });
+    });
+    document.addEventListener('click', function(e){
+      if(nav.classList.contains('open') && !nav.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') setOpen(false); });
+
+    // ---- scroll-spy: highlight current section + sync mobile label ----
+    var ids = anchors.map(function(a){ return a.getAttribute('href').slice(1); });
+    var targets = ids.map(function(id){ return document.getElementById(id); }).filter(Boolean);
+    function setActive(a){
+      if(!a || a.classList.contains('active')) return;
+      anchors.forEach(function(x){ x.classList.remove('active'); });
+      a.classList.add('active');
+      curEl.textContent = a.textContent;
+      if(links.scrollWidth > links.clientWidth){
+        var lr = links.getBoundingClientRect(), ar = a.getBoundingClientRect();
+        if(ar.left < lr.left || ar.right > lr.right){
+          links.scrollLeft += (ar.left - lr.left) - (lr.width - ar.width)/2;
+        }
+      }
+    }
+    if('IntersectionObserver' in window){
+      var io = new IntersectionObserver(function(){
+        var line = 100, best=null, bestDist=Infinity;
+        targets.forEach(function(t){
+          var top = t.getBoundingClientRect().top, dist = line - top;
+          if(dist >= 0 && dist < bestDist){ bestDist = dist; best = t.id; }
+        });
+        if(!best){ best = targets[0].id; }
+        var a = anchors.find(function(x){ return x.getAttribute('href')==='#'+best; });
+        setActive(a);
+      }, { threshold:[0,0.1,0.25,0.5,0.75,1] });
+      targets.forEach(function(t){ io.observe(t); });
+      var spyTick=false;
+      function recompute(){
+        var line=100, best=null, bestDist=Infinity;
+        targets.forEach(function(t){
+          var top=t.getBoundingClientRect().top, dist=line-top;
+          if(dist>=0 && dist<bestDist){ bestDist=dist; best=t.id; }
+        });
+        if(!best) best=targets[0].id;
+        setActive(anchors.find(function(x){return x.getAttribute('href')==='#'+best;}));
+        spyTick=false;
+      }
+      window.addEventListener('scroll', function(){ if(!spyTick){spyTick=true;requestAnimationFrame(recompute);} }, {passive:true});
+      window.addEventListener('resize', function(){ if(!spyTick){spyTick=true;requestAnimationFrame(recompute);} }, {passive:true});
+      recompute();
+    }
+
+    // ---- open a module if its hash is targeted ----
+    function openHashMod(){
+      if(location.hash){
+        var t = document.querySelector(location.hash);
+        if(t && t.classList && t.classList.contains('mod')) t.setAttribute('open','');
+      }
+    }
+    window.addEventListener('hashchange', openHashMod);
+    openHashMod();
+
+    // ---- keyboard: e = expand all modules, c = collapse ----
+    document.addEventListener('keydown', function(e){
+      if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+      if(e.key==='e') document.querySelectorAll('details.mod').forEach(function(d){ d.setAttribute('open',''); });
+      if(e.key==='c') document.querySelectorAll('details.mod').forEach(function(d){ d.removeAttribute('open'); });
+    });
+
+    // ---- diagram scroll-reveal (one-time per figure) ----
+    var figs = Array.prototype.slice.call(document.querySelectorAll('figure'));
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduce || !('IntersectionObserver' in window)){
+      figs.forEach(function(f){ f.classList.add('in'); });
+      var nm=document.querySelector('.brand-mark'); if(nm) nm.classList.add('show');
+    } else {
+      var figIO = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if(en.isIntersecting){ en.target.classList.add('in'); figIO.unobserve(en.target); }
+        });
+      }, { rootMargin:'0px 0px -12% 0px', threshold:0.15 });
+      figs.forEach(function(f){ figIO.observe(f); });
+      requestAnimationFrame(function(){
+        figs.forEach(function(f){
+          var r=f.getBoundingClientRect();
+          if(r.top < window.innerHeight*0.9) f.classList.add('in');
+        });
+      });
+
+      // ---- scroll-SCRUBBED diagrams (timeline), completing EARLY ----
+      var scrubbed = Array.prototype.slice.call(document.querySelectorAll('.fig-timeline, .fig-roadmap'));
+      scrubbed.forEach(function(f){ f.classList.add('scrubbed'); });
+      function scrub(){
+        var vh = window.innerHeight;
+        scrubbed.forEach(function(f){
+          var r = f.getBoundingClientRect();
+          var startTop = vh * 0.85, travel = vh * 0.35;
+          var p = (startTop - r.top) / travel;
+          p = Math.max(0, Math.min(1, p));
+          f.style.setProperty('--p', p.toFixed(3));
+          f.querySelectorAll('[data-at]').forEach(function(el){
+            var on = p >= parseFloat(el.getAttribute('data-at'));
+            if(el.classList.contains('tl-node')) el.classList.toggle('lit', on);
+            else el.classList.toggle('show', on);
+          });
+        });
+        scrubTicking = false;
+      }
+      var scrubTicking = false;
+      function onScrubScroll(){ if(!scrubTicking){ scrubTicking = true; requestAnimationFrame(scrub); } }
+      if(scrubbed.length){
+        window.addEventListener('scroll', onScrubScroll, {passive:true});
+        window.addEventListener('resize', onScrubScroll, {passive:true});
+        scrub();
+      }
+
+      // ---- brand mark: rotates with scroll ----
+      var stars = Array.prototype.slice.call(document.querySelectorAll('.spin-star'));
+      if(stars.length){
+        var lastY = window.pageYOffset || 0, angle = 0, spinTick = false;
+        var DEG_PER_PX = 0.18;
+        function spin(){
+          var y = window.pageYOffset || 0;
+          angle += (y - lastY) * DEG_PER_PX;
+          lastY = y;
+          var v = angle.toFixed(1) + 'deg';
+          stars.forEach(function(s){ s.style.setProperty('--spin', v); });
+          spinTick = false;
+        }
+        window.addEventListener('scroll', function(){ if(!spinTick){ spinTick = true; requestAnimationFrame(spin); } }, {passive:true});
+      }
+      // ---- nav mark appears once the masthead mark scrolls out of view ----
+      var mastLogo = document.querySelector('.brand-logo');
+      var navMark = document.querySelector('.brand-mark');
+      if(mastLogo && navMark){
+        var navLogoIO = new IntersectionObserver(function(entries){
+          entries.forEach(function(en){ navMark.classList.toggle('show', !en.isIntersecting); });
+        }, { threshold:0 });
+        navLogoIO.observe(mastLogo);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

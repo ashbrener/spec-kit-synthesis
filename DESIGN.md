@@ -756,7 +756,7 @@ it is this seam.
    diagram graphs); a deterministic renderer makes interactive SVG HTML; a theme
    is cosmetic data applied at render. Three clean stages. (§6)
 
-### 11.3 Resolved decisions (the flag is planted on all nine)
+### 11.3 Resolved decisions (the flag is planted on all ten)
 
 | # | Decision | Resolution |
 |---|----------|------------|
@@ -769,6 +769,7 @@ it is this seam.
 | 7 | Standalone engine / OSS | **Option preserved by the seam (11.1); not built until the engine is proven on real sources.** |
 | 8 | Multi-source | **Multi-source is the architecture; sources are sequenced (11.4). Spec-kit first, code next.** |
 | 9 | Theme delivery | **Theme is data the renderer reads; storybook is its only consumer.** No agent-invokable skill. |
+| 10 | Renderer surface | **The editorial design system is the single default renderer output** (spec `specs/001-renderer-v2/`): vanilla self-contained HTML, no SPA; light-only; per-section disclosure (no global depth toggle); diagrams semantic + animated per-layout; fonts via CDN. Theme stays a retint layer. |
 
 ### 11.4 Build sequence (each phase ships value; none requires a teardown)
 
@@ -786,9 +787,11 @@ The seams and invariants (11.1–11.2) are present from Phase 1; later phases ad
   unspecced). The seam held: a merged spec+code corpus passed the *unchanged*
   Phase-1 gate. Coverage run judged faithful (0/0/0) after a 3→0 convergence.
 - **Phase 3 — Reach & polish. 🟡 IN PROGRESS.** Done: the push-button one-command
-  UX (specs and specs+code), CI, an in-repo e2e fixture. Now: additional source
-  adapters (design-doc/ADR) and host-theme detection. Later: the optional voice
-  profile; richer diagram affordances.
+  UX (specs and specs+code), CI, an in-repo e2e fixture, the design-doc/ADR
+  adapter, host-theme detection, and **renderer v2 — the editorial design system
+  as the default output, with per-section disclosure and per-layout diagram
+  motion** (spec `specs/001-renderer-v2/`). Later: the optional voice profile;
+  richer diagram affordances.
 - **Phase 4 — (Strategic, decide later) Standalone engine / OSS.** The
   precondition is now met (the core has earned it across ≥2 real source types —
   spec-kit and code). The seam makes this a packaging exercise, not a rewrite.

@@ -96,35 +96,34 @@ def _normalise_name(name: str) -> str:
 
 
 # (regex, token, high_confidence)
+# Targets the editorial design-system token vocabulary (renderer v2, spec 001):
+#   accent → gold, surfaces → paper/paper-2, text → ink, borders → line/line-dk,
+#   semantic hues → red/green/blue. (No ink-2/-3, plum/ochre/teal, accent-soft.)
 _COLOR_RULES: list[tuple[re.Pattern[str], str, bool]] = [
-    # accent / brand — high confidence
-    (re.compile(r"^(primary|accent|brand)(-(color|colour|default|500|600|main|base))?$"), "accent", True),
-    (re.compile(r"^(primary|accent|brand)-(dark|700|800|900|d|hover|active)$"), "accent-d", True),
-    (re.compile(r"^(primary|accent|brand)-(light|soft|subtle|100|50|tint|bg|background)$"), "accent-soft", False),
+    # accent / brand → gold — high confidence
+    (re.compile(r"^(primary|accent|brand)(-(color|colour|default|500|600|main|base))?$"), "gold", True),
+    (re.compile(r"^(primary|accent|brand)-(dark|700|800|900|d|hover|active|bright|light)$"), "gold-bright", True),
     # background / surface → paper
     (re.compile(r"^(background|bg|surface|paper|canvas|base)(-(color|colour|default|primary|0|50|100))?$"), "paper", True),
     (re.compile(r"^(background|bg|surface)-(2|secondary|alt|subtle|muted|raised)$"), "paper-2", False),
-    (re.compile(r"^(background|bg|surface)-(3|tertiary|sunken|inset)$"), "paper-3", False),
     # foreground / text / ink
     (re.compile(r"^(foreground|fg|text|ink|content|copy|body)(-(color|colour|default|primary|900|base))?$"), "ink", True),
-    (re.compile(r"^(foreground|fg|text|ink|content)-(2|secondary|muted|subtle|600|700)$"), "ink-2", False),
-    (re.compile(r"^(foreground|fg|text|ink|content)-(3|tertiary|disabled|faint|placeholder|400|500)$"), "ink-3", False),
-    (re.compile(r"^(muted|secondary|subtle)(-(foreground|fg|text))?$"), "ink-2", False),
-    # borders / dividers → hair
-    (re.compile(r"^(border|hairline|hair|divider|rule|outline|stroke)(-(color|colour|default|primary))?$"), "hair", True),
-    (re.compile(r"^(border|divider)-(2|strong|dark|secondary)$"), "hair-2", False),
-    # accent-adjacent callout hues (best-effort, low confidence)
-    (re.compile(r"^(plum|violet|purple)$"), "plum", False),
-    (re.compile(r"^(ochre|amber|gold|warning)$"), "ochre", False),
-    (re.compile(r"^(teal|cyan|success)$"), "teal", False),
+    # borders / dividers → line
+    (re.compile(r"^(border|hairline|hair|divider|rule|outline|stroke)(-(color|colour|default|primary))?$"), "line", True),
+    (re.compile(r"^(border|divider)-(2|strong|dark|secondary)$"), "line-dk", False),
+    # semantic hues (best-effort, low confidence)
+    (re.compile(r"^(danger|error|destructive|red)$"), "red", False),
+    (re.compile(r"^(success|green)$"), "green", False),
+    (re.compile(r"^(info|blue)$"), "blue", False),
+    (re.compile(r"^(warning|amber|ochre)$"), "gold-bright", False),
 ]
 
 # Font-family source names → token. (regex, token, high_confidence)
 _FONT_RULES: list[tuple[re.Pattern[str], str, bool]] = [
-    (re.compile(r"(mono|code|tt)"), "mono", True),
-    (re.compile(r"(serif|display|heading|head|title)"), "serif", False),
-    (re.compile(r"(sans|body|base|text|default|ui)"), "sans", True),
-    (re.compile(r"(font|family|type|typeface)"), "sans", False),
+    (re.compile(r"(mono|code|tt)"), "font-mono", True),
+    (re.compile(r"(serif|display|heading|head|title)"), "font-display", False),
+    (re.compile(r"(sans|body|base|text|default|ui)"), "font-body", True),
+    (re.compile(r"(font|family|type|typeface)"), "font-body", False),
 ]
 
 
@@ -183,7 +182,7 @@ class Detection:
 
     def has_palette(self) -> bool:
         """A 'usable palette' = at least one core color token was detected."""
-        core = {"paper", "ink", "accent"}
+        core = {"paper", "ink", "gold"}
         return any(t in self._tokens for t in core)
 
 

@@ -269,7 +269,8 @@ class DiagramGraph(BaseModel):
     """Declarative diagram intent; the renderer lays it out to interactive SVG (DESIGN §6)."""
 
     model_config = {"extra": "forbid"}
-    layout: Literal["pipeline", "mapping", "ladder", "flow", "panel"] = "pipeline"
+    layout: Literal["pipeline", "mapping", "ladder", "flow", "panel", "hub", "stack", "timeline"] = "pipeline"
+    title: Optional[str] = Field(None, description="Optional diagram title, rendered in the display face above the figure (renderer v2).")
     nodes: list[DiagramNode] = Field(default_factory=list)
     edges: list[DiagramEdge] = Field(default_factory=list)
 
@@ -283,6 +284,7 @@ class Block(BaseModel):
     altitude: Altitude = Altitude.FUNCTIONAL
     # Exactly one payload is set, matching `type`:
     prose: Optional[str] = None
+    prose_style: Optional[Literal["lead", "pull"]] = Field(default=None, description="PROSE-only: render as a lead paragraph ('lead') or a pull-quote ('pull').")
     table: Optional[list[list[str]]] = None
     callout_kind: Optional[CalloutKind] = None
     callout_tag: Optional[str] = None
@@ -302,6 +304,8 @@ class Block(BaseModel):
         }
         if not present[self.type]:
             raise ValueError(f"Block of type {self.type} is missing its payload.")
+        if self.prose_style is not None and self.type is not BlockType.PROSE:
+            raise ValueError(f"prose_style is only valid on PROSE blocks (got {self.type}).")
         return self
 
 
@@ -312,18 +316,37 @@ class Section(BaseModel):
     id: str
     number: int
     title: str
+    strap: Optional[str] = Field(None, description="Short eyebrow shown beside the section number ('NN — strap'). Renderer v2.")
     subtitle: Optional[str] = None
     blocks: list[Block] = Field(default_factory=list)
 
 
+class MetaPair(BaseModel):
+    """One label/value pair for the masthead metadata row (renderer v2, spec 001)."""
+
+    model_config = {"extra": "forbid"}
+
+    label: str
+    value: str
+
+
 class DocumentModel(BaseModel):
-    """The full storybook content, pre-render (Phase C output)."""
+    """The full storybook content, pre-render (Phase C output).
+
+    Renderer v2 (spec 001) adds masthead fields — project_name, title_accent,
+    kicker, meta — to populate the editorial design-system shell. All are
+    optional with graceful fallbacks (project_name falls back to title).
+    """
 
     model_config = {"extra": "forbid"}
 
     schema_version: str = SCHEMA_VERSION
     title: str
-    lede: Optional[str] = None
+    title_accent: Optional[str] = Field(None, description="Substring of `title` rendered in the masthead accent <em>; cosmetic, optional.")
+    lede: Optional[str] = Field(None, description="One-line deck under the title (the masthead dek).")
+    project_name: Optional[str] = Field(None, description="Brand wordmark + colophon label; falls back to `title` when unset.")
+    kicker: Optional[list[str]] = Field(None, description="Masthead eyebrow spans (≤2): first renders left, second right.")
+    meta: list[MetaPair] = Field(default_factory=list, description="Masthead metadata row (label/value pairs).")
     sections: list[Section] = Field(default_factory=list)
 
 
@@ -335,5 +358,5 @@ __all__ = [
     "EvolutionNote", "CoverageStatus", "CoverageItem", "ArchitectureModel",
     "BlockType", "CalloutKind",
     "DiagramNode", "DiagramEdge", "DiagramGraph",
-    "Block", "Section", "DocumentModel",
+    "Block", "Section", "MetaPair", "DocumentModel",
 ]

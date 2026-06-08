@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""Deterministic HTML renderer for spec-kit-synthesis (DESIGN §6, §11.2 #7).
+"""Deterministic HTML renderer for spec-kit-synthesis (renderer v2 — spec 001).
 
 INPUT  : a `DocumentModel` JSON (the compose output; see schema.py).
-OUTPUT : one self-contained, interactive HTML "technical-manuscript" storybook,
-         structurally + behaviourally matching examples/speckit-linear-architecture.html.
+OUTPUT : one self-contained, interactive HTML storybook in the editorial design
+         system — the visual contract at `skill/templates/storybook.html`.
 
-This module is PURE: stdlib only, NO LLM, NO network, NO timestamps, NO randomness.
-Identical input bytes → identical output bytes (the composition is the only source of
-prose; the renderer never invents text and never injects source numbers into the body).
+This module is PURE: stdlib only, NO LLM, NO network at render time, NO timestamps,
+NO randomness. Identical input bytes → identical output bytes. The renderer never
+invents prose and never injects source identifiers into the narrative body.
 
-Three clean stages are honoured (DESIGN §11.2 #7): composition (the DocumentModel) ≠
-markup (this renderer) ≠ theme (a flat dict of CSS custom-property tokens applied at
-render). Re-theming requires no re-layout because every diagram coordinate is fixed and
-every colour/font is a CSS variable.
+Renderer v2 (spec 001) replaces the old shell with the editorial design system:
+  - warm light palette (light-only; no dark toggle), Fraunces / Newsreader / Spline Sans Mono
+  - per-section disclosure (technical detail inside a <details> per section) — no global depth
+  - inline source-typed citation chips + a doc-wide References appendix
+  - eight hand-laid SVG diagram layouts, each with its own semantically-appropriate,
+    reduced-motion/print-safe entrance animation (motion fitted to each layout's grammar)
+
+Three clean stages are honoured: composition (the DocumentModel) ≠ markup (this renderer) ≠
+theme (a flat dict of CSS custom-property tokens). The faithfulness engine (adapters, reconcile,
+verify.py) is unaffected — verify.py validates the IR, never the HTML.
 
 CLI:
     uv run python skill/scripts/render.py <document_model.json> [--theme <theme.json>] [--out <out.html>]
@@ -23,6 +29,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Optional
@@ -44,77 +51,60 @@ from schema import (  # noqa: E402
     SourceType,
 )
 
+REPO_URL = "https://github.com/ashbrener/spec-kit-synthesis"
+
 # ────────────────────────────── default reference theme ─────────────────────
-# The north-star's palette/fonts. A --theme JSON is a *flat* dict of these keys;
-# any subset overrides the defaults. Keys map 1:1 to CSS custom properties.
+# The editorial design-system palette + fonts. A --theme JSON is a *flat* dict of
+# these keys; any subset overrides the defaults. Keys map 1:1 to CSS custom properties.
+# (Light-only by design — there is no dark variant.)
 
 DEFAULT_THEME: dict[str, str] = {
-    # paper / ink
-    "paper": "#faf7f0",
-    "paper-2": "#f3efe4",
-    "paper-3": "#ece6d7",
-    "ink": "#17150f",
-    "ink-2": "#56524a",
-    "ink-3": "#87827a",
-    "hair": "#e1dac9",
-    "hair-2": "#d2c9b3",
-    # accent
-    "accent": "#b3471d",
-    "accent-d": "#8f3614",
-    "accent-soft": "#f6e6da",
-    # three callout hues (decision=accent, unspecified=ochre, evolution=plum)
-    "plum": "#6a3a6f",
-    "plum-soft": "#efe4f0",
-    "ochre": "#9a6b14",
-    "ochre-soft": "#f6ecd2",
-    "teal": "#1f5048",
-    "teal-soft": "#e2ece7",
-    # fonts
-    "sans": '"Bricolage Grotesque", system-ui, sans-serif',
-    "serif": '"Newsreader", Georgia, serif',
-    "mono": '"IBM Plex Mono", ui-monospace, Menlo, monospace',
+    "ink": "#16140f",
+    "paper": "#f4f0e6",
+    "paper-2": "#ebe5d6",
+    "gold": "#a8742a",
+    "gold-bright": "#cf9a3c",
+    "red": "#9b3022",
+    "green": "#3f5d3a",
+    "blue": "#2c4a63",
+    "line": "#cdc4ad",
+    "line-dk": "#b3a98d",
+    "shadow": "rgba(40,32,16,.16)",
+    "font-display": "'Fraunces', Georgia, serif",
+    "font-body": "'Newsreader', Georgia, serif",
+    "font-mono": "'Spline Sans Mono', ui-monospace, Menlo, monospace",
 }
 
-# Dark theme is fixed (it is a relationship to the light tokens, not a user token set);
-# it always renders so the theme toggle has somewhere to go.
-DARK_THEME: dict[str, str] = {
-    "paper": "#16150f",
-    "paper-2": "#1e1d15",
-    "paper-3": "#27251a",
-    "ink": "#f3eee1",
-    "ink-2": "#b3ad9c",
-    "ink-3": "#837d6e",
-    "hair": "#322f23",
-    "hair-2": "#423d2d",
-    "accent": "#e3743f",
-    "accent-d": "#f0905f",
-    "accent-soft": "#2c2016",
-    "plum": "#c79bcb",
-    "plum-soft": "#241a26",
-    "ochre": "#d7a13f",
-    "ochre-soft": "#272013",
-    "teal": "#6fb9ab",
-    "teal-soft": "#16241f",
-}
-
-# SourceType → the citation chip's data-t attribute (drives the typed badge colour).
+# SourceType → the citation chip's short type token (drives the typed badge colour).
 SOURCE_T = {
     SourceType.SPEC: "spec",
     SourceType.CODE: "code",
     SourceType.DESIGN_DOC: "doc",
 }
 
+# CalloutKind → design-system note variant. decision=affirmative (green),
+# unspecified=warning (red), evolution=neutral (plain).
 CALLOUT_CLASS = {
-    CalloutKind.DECISION: "decision",
-    CalloutKind.UNSPECIFIED: "unspec",
-    CalloutKind.EVOLUTION: "hist",
+    CalloutKind.DECISION: "flag-ok",
+    CalloutKind.UNSPECIFIED: "flag",
+    CalloutKind.EVOLUTION: "",
 }
-
 CALLOUT_DEFAULT_TAG = {
     CalloutKind.DECISION: "Decision",
     CalloutKind.UNSPECIFIED: "Unspecified",
     CalloutKind.EVOLUTION: "Evolution",
 }
+
+# CoverageStatus value → (pill class, human label).
+COVERAGE_PILL = {
+    "spec_backed": ("build", "Specified &amp; built"),
+    "specced_only": ("buy", "Specified, not in scanned source"),
+    "implemented_only": ("hybrid", "Built, not specified"),
+    "unknown": ("hard", "Unknown"),
+}
+
+# Brand wordmark / colophon labels for the source types present.
+SOURCE_LABEL = {"spec": "spec", "code": "code", "doc": "design-doc"}
 
 
 def esc(s: Optional[str]) -> str:
@@ -122,261 +112,419 @@ def esc(s: Optional[str]) -> str:
     return html.escape(s or "", quote=True)
 
 
+# ────────────────────────────── brand glyph ─────────────────────────────────
+# A neutral geometric mark (an asterisk) — carries no third-party identity. The
+# .spin-star group rotates with scroll. Used in the masthead and the sticky nav.
+
+GLYPH = (
+    '<svg class="glyph" viewBox="0 0 40 40" role="img" aria-label="mark" xmlns="http://www.w3.org/2000/svg">'
+    '<g class="spin-star"><g transform="translate(20,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round">'
+    '<line x1="-13" y1="0" x2="13" y2="0"/><line x1="0" y1="-13" x2="0" y2="13"/>'
+    '<line x1="-9.2" y1="-9.2" x2="9.2" y2="9.2"/><line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/>'
+    "</g></g></svg>"
+)
+
+
 # ────────────────────────────────── CSS ─────────────────────────────────────
-# Lifted structurally from the north-star: the :root block is generated from the
-# theme dict so re-theming is pure data. Everything downstream references vars.
 
 def _theme_vars(theme: dict[str, str]) -> str:
-    return "\n".join(f"    --{k}: {v};" for k, v in theme.items())
+    return "\n".join(f"  --{k}: {v};" for k, v in theme.items())
+
+
+_FONT_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2?"
+    "family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500"
+    "&family=Spline+Sans+Mono:wght@400;500;600"
+    "&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');\n"
+)
+
+# Static stylesheet — ported from the visual contract (skill/templates/storybook.html),
+# with fonts and key surfaces referenced through CSS variables so a --theme retint applies
+# without re-layout. References var(--*) only; no Python interpolation here.
+_STATIC_CSS = """
+  :root{ color-scheme: light; }
+  html{ color-scheme: light; background-color: var(--paper) !important; scroll-behavior: smooth; }
+  body{ background-color: var(--paper) !important; min-height: 100vh; }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior: auto; } }
+
+  *{ box-sizing: border-box; margin: 0; padding: 0; }
+  body{
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 18px; line-height: 1.62;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(168,116,42,.05), transparent 40%),
+      radial-gradient(circle at 88% 92%, rgba(44,74,99,.05), transparent 42%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .grain{ position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"); }
+
+  .wrap{ max-width: 1180px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 2; }
+
+  /* brand */
+  .spin-star{ transform-box: fill-box; transform-origin: center; transform: rotate(var(--spin,0deg)); transition: transform .35s var(--ease); will-change: transform; }
+  .brand-logo{ display: inline-flex; align-items: center; gap: 11px; margin-bottom: 22px; text-decoration: none; color: var(--ink); }
+  .glyph{ display: block; height: 32px; width: 32px; }
+  .brand-word{ font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: -.01em; }
+  nav.toc .brand-mark{ display: flex; align-items: center; gap: 8px; flex: 0 0 auto; text-decoration: none; color: var(--ink);
+    opacity: 0; max-width: 0; overflow: hidden; padding-right: 0; margin-right: 0; border-right: 1px solid transparent;
+    transition: opacity .3s ease, max-width .35s ease, padding-right .35s ease, margin-right .35s ease; }
+  nav.toc .brand-mark.show{ opacity: 1; max-width: 260px; padding-right: 16px; margin-right: 8px; border-right-color: var(--line-dk); }
+  nav.toc .brand-mark .glyph{ height: 20px; width: 20px; }
+  nav.toc .brand-mark .brand-word{ font-size: 16px; }
+
+  /* masthead */
+  header.mast{ border-bottom: 3px double var(--ink); padding: 40px 0 22px; margin-bottom: 8px; }
+  .kicker{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .32em; text-transform: uppercase; color: var(--gold);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 18px; }
+  h1.title{ font-family: var(--font-display); font-weight: 900; font-size: clamp(2.4rem,6vw,4.6rem); line-height: .96; letter-spacing: -.02em; }
+  h1.title em{ font-style: italic; font-weight: 500; color: var(--gold); }
+  .dek{ font-size: clamp(1.05rem,2vw,1.32rem); max-width: 720px; margin-top: 18px; color: #42392a; line-height: 1.5; }
+  .meta-row{ display: flex; gap: 26px; flex-wrap: wrap; margin-top: 22px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5b513c; }
+  .meta-row b{ color: var(--ink); font-weight: 600; }
+
+  /* sticky nav */
+  nav.toc{ position: sticky; top: 0; z-index: 50; background: rgba(244,240,230,.96);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line-dk); box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 6px 18px -12px var(--shadow);
+    padding: 10px 0; margin-bottom: 46px; }
+  nav.toc .wrap{ display: flex; gap: 5px; align-items: center; }
+  nav.toc .links{ display: flex; gap: 4px; align-items: center; flex: 1; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  nav.toc .links::-webkit-scrollbar{ display: none; }
+  nav.toc a{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: #5b513c; text-decoration: none;
+    padding: 6px 10px; border: 1px solid transparent; border-radius: 3px; transition: all .18s; white-space: nowrap; flex: 0 0 auto; }
+  nav.toc a:hover, nav.toc a:focus-visible{ color: var(--ink); border-color: var(--line-dk); background: var(--paper-2); outline: none; }
+  nav.toc a.active{ color: var(--gold); border-color: var(--gold); background: rgba(168,116,42,.08); font-weight: 600; }
+  nav.toc .navbtn{ display: none; align-items: center; gap: 9px; width: 100%; background: none; border: none; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); padding: 4px 2px; }
+  nav.toc .navbtn .lbl{ flex: 1; text-align: left; color: #5b513c; }
+  nav.toc .navbtn .cur{ color: var(--ink); font-weight: 600; }
+  nav.toc .navbtn .bars{ display: inline-flex; flex-direction: column; gap: 3px; width: 20px; }
+  nav.toc .navbtn .bars span{ height: 2px; background: var(--ink); border-radius: 2px; transition: transform .25s, opacity .2s; }
+  nav.toc.open .navbtn .bars span:nth-child(1){ transform: translateY(5px) rotate(45deg); }
+  nav.toc.open .navbtn .bars span:nth-child(2){ opacity: 0; }
+  nav.toc.open .navbtn .bars span:nth-child(3){ transform: translateY(-5px) rotate(-45deg); }
+
+  /* sections + type */
+  section{ margin-bottom: 64px; scroll-margin-top: 64px; }
+  .sec-num{ font-family: var(--font-mono); font-size: 12px; letter-spacing: .2em; color: var(--gold); text-transform: uppercase; }
+  h2{ font-family: var(--font-display); font-weight: 900; font-size: clamp(1.9rem,4vw,3rem); line-height: 1.04; letter-spacing: -.015em; margin: 6px 0 8px; }
+  h3{ font-family: var(--font-display); font-weight: 600; font-size: 1.45rem; margin: 34px 0 12px; letter-spacing: -.01em; }
+  h4{ font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin: 24px 0 8px; }
+  p{ margin-bottom: 16px; max-width: 74ch; }
+  p.lead{ font-size: 1.22rem; line-height: 1.5; color: #2e2a20; }
+  p.pull{ border-left: 3px solid var(--gold); padding: 6px 0 6px 22px; margin: 30px 0; font-family: var(--font-display); font-style: italic; font-size: 1.5rem; line-height: 1.32; color: #2e2a20; max-width: none; }
+  a{ color: var(--blue); text-underline-offset: 3px; }
+  strong{ font-weight: 600; color: var(--ink); }
+  em.term{ font-style: italic; color: var(--gold); font-weight: 500; }
+  .mono{ font-family: var(--font-mono); font-size: .82em; }
+  .divider{ border: none; border-top: 1px solid var(--line); margin: 48px 0; }
+
+  /* callouts */
+  .note{ background: var(--paper-2); border: 1px solid var(--line-dk); border-radius: 4px; padding: 18px 22px; margin: 24px 0; font-size: .96rem; line-height: 1.55; max-width: 74ch; }
+  .note .tag{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); display: block; margin-bottom: 6px; }
+  .note.flag{ border-left: 3px solid var(--red); }
+  .note.flag .tag{ color: var(--red); }
+  .note.flag-ok{ border-left: 3px solid var(--green); }
+  .note.flag-ok .tag{ color: var(--green); }
+
+  /* tables */
+  .tbl-scroll{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.tbl{ width: 100%; border-collapse: collapse; margin: 20px 0; font-size: .93rem; }
+  table.tbl th{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--ink); color: #42392a; vertical-align: bottom; }
+  table.tbl td{ padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.42; }
+  table.tbl tr:hover td{ background: rgba(168,116,42,.05); }
+  .cov-note{ font-size: 12.5px; color: #7d705a; margin-top: 3px; }
+  td.covsrc{ display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill{ display: inline-block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+  .pill.build{ background: #d8e4d2; color: #2f4628; }
+  .pill.buy{ background: #f0dccb; color: #7a4316; }
+  .pill.hybrid{ background: #d9e2ea; color: #274056; }
+  .pill.hard{ background: #efd0c9; color: #7c2618; }
+
+  /* per-section disclosure */
+  .mod{ border: 1px solid var(--line-dk); border-radius: 5px; margin: 24px 0 12px; overflow: hidden; background: rgba(255,253,247,.5); transition: box-shadow .2s; }
+  .mod[open]{ box-shadow: 0 8px 30px var(--shadow); }
+  .mod summary{ cursor: pointer; list-style: none; padding: 18px 22px; display: flex; align-items: center; gap: 18px; transition: background .18s; }
+  .mod summary::-webkit-details-marker{ display: none; }
+  .mod summary:hover{ background: var(--paper-2); }
+  .mod .mt{ font-family: var(--font-display); font-weight: 600; font-size: 1.16rem; flex: 1; letter-spacing: -.01em; }
+  .mod .mx{ font-family: var(--font-mono); font-size: 20px; color: var(--gold); transition: transform .25s; }
+  .mod[open] .mx{ transform: rotate(45deg); }
+  .mod .body{ padding: 4px 24px 24px; border-top: 1px solid var(--line); }
+  .mod .body p{ font-size: .97rem; }
+  .what{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #7d705a; margin: 16px 0 4px; }
+
+  /* per-section sources line + inline citation chips */
+  .srcline{ margin: 18px 0 4px; font-family: var(--font-mono); font-size: 11px; color: #7d705a; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: baseline; }
+  .srcline .srclab{ letter-spacing: .16em; text-transform: uppercase; color: #9a8e74; }
+  .srcline a.ref{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); }
+  .srcline a.ref:hover{ border-bottom-color: var(--blue); }
+  .cite-t{ display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; color: #fff; margin-right: 5px; }
+  .cite-t.spec{ background: var(--gold); }
+  .cite-t.code{ background: var(--green); }
+  .cite-t.doc{ background: var(--blue); }
+
+  /* diagram frames */
+  figure{ margin: 34px 0; border: 1px solid var(--line-dk); border-radius: 6px; background: #fbf9f2; padding: 8px; box-shadow: 0 4px 20px var(--shadow); overflow: hidden; }
+  figure svg{ display: block; width: 100%; height: auto; }
+  figcaption{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: #6b5f48; padding: 10px 14px 6px; border-top: 1px solid var(--line); margin-top: 8px; text-transform: uppercase; }
+  figcaption b{ color: var(--ink); }
+
+  /* SVG diagram primitives — ALL visual styling (fill / stroke / font / weight) is emitted
+     INLINE (literal values) on each element, so diagrams render correctly even where the
+     document <style> is not cascaded into inline SVG (QuickLook, mail/preview panes, some PDF
+     paths). CSS here carries only the pointer affordance; motion rules live further below. */
+  .d-node.act{ cursor: pointer; }
+
+  /* ===== per-layout diagram MOTION (fitted to each layout's grammar) ===== */
+  figure{ opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s var(--ease); }
+  figure.in{ opacity: 1; transform: none; }
+
+  @keyframes partIn{ from{ opacity: 0; } to{ opacity: 1; } }
+  @keyframes popIn{ 0%{ opacity: 0; transform: scale(.4);} 60%{ transform: scale(1.12);} 100%{ opacity: 1; transform: scale(1);} }
+  @keyframes drawIn{ to{ stroke-dashoffset: 0; } }
+  @keyframes sweep{ from{ transform: rotate(-90deg); opacity: 0;} 40%{ opacity: 1;} to{ transform: rotate(0); opacity: 1;} }
+  @keyframes layerIn{ from{ opacity: 0; transform: translateY(14px);} to{ opacity: 1; transform: none;} }
+  @keyframes riseIn{ from{ opacity: 0; transform: translateY(10px);} to{ opacity: 1; transform: none;} }
+  @keyframes traceMove{ 0%{ stroke-dashoffset: 1600; opacity: 0;} 8%{ opacity: .9;} 90%{ opacity: .9;} 100%{ stroke-dashoffset: -40; opacity: 0;} }
+
+  /* staggered delays (shared) */
+  .a0{ animation-delay: .06s; } .a1{ animation-delay: .14s; } .a2{ animation-delay: .22s; }
+  .a3{ animation-delay: .30s; } .a4{ animation-delay: .38s; } .a5{ animation-delay: .46s; }
+  .a6{ animation-delay: .54s; } .a7{ animation-delay: .62s; } .a8{ animation-delay: .70s; }
+  .a9{ animation-delay: .78s; } .a10{ animation-delay: .86s; } .a11{ animation-delay: .94s; }
+
+  /* pipeline — stages illuminate L→R */
+  .fig-pipeline.in svg .anim{ animation: popIn .5s var(--ease) both; transform-box: fill-box; transform-origin: center; }
+  /* flow — nodes drop in top→bottom; a comet traces the spine (flow is continuous) */
+  .fig-flow.in svg .anim{ animation: riseIn .5s var(--ease) both; }
+  .flow-trace{ fill: none; stroke: var(--gold-bright); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 26 1600; stroke-dashoffset: 1600; opacity: 0; }
+  .fig-flow.in .flow-trace{ animation: traceMove 3s cubic-bezier(.4,0,.2,1) .8s infinite; }
+  /* ladder — rungs draw in order */
+  .fig-ladder.in svg .anim{ animation: riseIn .5s var(--ease) both; }
+  /* mapping — left column, then links draw, then right column */
+  .fig-mapping.in svg .lm-l, .fig-mapping.in svg .lm-r{ animation: partIn .45s ease both; }
+  .fig-mapping.in svg .lm-r{ animation-delay: .7s; }
+  .fig-mapping.in svg .lm-k{ stroke-dasharray: 760; stroke-dashoffset: 760; animation: drawIn .5s ease .45s both; }
+  /* panel — cards stagger-fade */
+  .fig-panel.in svg .anim{ animation: partIn .45s ease both; }
+  /* hub — core pops, spokes draw outward, nodes fade, ring sweeps */
+  .fig-hub.in svg .hub-core{ animation: popIn .5s var(--ease) .05s both; transform-box: fill-box; transform-origin: center; }
+  .fig-hub.in svg .hub-spoke{ stroke-dasharray: 240; stroke-dashoffset: 240; animation: drawIn .5s ease .32s both; }
+  .fig-hub.in svg .hub-node{ animation: partIn .45s ease .55s both; }
+  .fig-hub.in svg .hub-ring{ transform-box: fill-box; transform-origin: center; animation: sweep .7s var(--ease) .85s both; }
+  /* stack — layers build bottom-up (bottom layer carries .a0) */
+  .fig-stack.in svg .stack-layer{ animation: layerIn .55s var(--ease) both; }
+  /* timeline — line draws L→R, nodes light in order (scroll-scrubbed via --p) */
+  .fig-timeline svg .tl-line{ stroke-dasharray: 900; stroke-dashoffset: calc(900 - 900 * var(--p,0)); }
+  .fig-timeline svg .tl-node{ opacity: 0; transform: scale(.4); transform-box: fill-box; transform-origin: center; transition: opacity .25s, transform .25s; }
+  .fig-timeline svg .tl-node.lit{ opacity: 1; transform: scale(1); }
+  .fig-timeline.in:not(.scrubbed) svg .tl-line{ stroke-dashoffset: 0; transition: stroke-dashoffset 1s ease; }
+  .fig-timeline.in:not(.scrubbed) svg .tl-node{ opacity: 1; transform: scale(1); }
+
+  /* footer */
+  footer{ border-top: 3px double var(--ink); margin-top: 30px; padding: 30px 0 70px; font-size: .86rem; color: #5b513c; }
+  footer h3{ margin-top: 6px; }
+  footer .reflist{ columns: 2; column-gap: 40px; font-size: .8rem; line-height: 1.55; margin-top: 16px; }
+  footer .reflist p{ margin-bottom: 8px; max-width: none; break-inside: avoid; }
+  .reftype{ font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #fff; padding: 1px 5px; border-radius: 4px; margin-right: 6px; }
+  .reftype.spec{ background: var(--gold); } .reftype.code{ background: var(--green); } .reftype.doc{ background: var(--blue); }
+  .colophon{ width: 100%; border-collapse: collapse; margin-top: 22px; font-family: var(--font-mono); font-size: 11px; background: var(--paper-2); border: 1px solid var(--line-dk); border-radius: 5px; overflow: hidden; }
+  .colophon th, .colophon td{ text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
+  .colophon tbody tr:last-child th, .colophon tbody tr:last-child td{ border-bottom: none; }
+  .colophon tbody th{ width: 120px; white-space: nowrap; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); font-weight: 600; background: rgba(168,116,42,.06); border-right: 1px solid var(--line); }
+  .colophon td{ color: #3a3324; }
+  .vtag{ display: inline-block; background: var(--ink); color: var(--paper); padding: 2px 9px; border-radius: 10px; font-size: 10px; letter-spacing: .06em; font-weight: 600; }
+  .genline{ margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 10px; line-height: 1.7; letter-spacing: .04em; color: #7d705a; max-width: none; text-transform: uppercase; }
+  .genline .gm{ color: var(--green); margin-right: 6px; }
+  .genline a{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.4); }
+  .genline a:hover{ border-bottom-color: var(--blue); }
+
+  ul.clean{ list-style: none; margin: 12px 0; }
+  ul.clean li{ padding: 5px 0 5px 22px; position: relative; font-size: .97rem; line-height: 1.45; }
+  ul.clean li::before{ content: "\\2192"; position: absolute; left: 0; color: var(--gold); font-family: var(--font-mono); }
+
+  ol.steps{ margin: 14px 0 14px 4px; counter-reset: s; list-style: none; }
+  ol.steps li{ counter-increment: s; padding: 8px 0 8px 40px; position: relative; border-bottom: 1px dotted var(--line); font-size: .96rem; }
+  ol.steps li::before{ content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--gold); font-weight: 600; }
+
+  .anchor{ display: block; position: relative; top: -64px; visibility: hidden; }
+
+  /* responsive */
+  @media (max-width: 900px){ body{ font-size: 17px; } .wrap{ padding: 0 22px; } }
+  @media (max-width: 680px){
+    body{ font-size: 16px; line-height: 1.58; }
+    .wrap{ padding: 0 18px; }
+    header.mast{ padding: 28px 0 18px; }
+    .kicker{ font-size: 9.5px; letter-spacing: .2em; }
+    .dek{ font-size: 1.06rem; }
+    .meta-row{ gap: 14px 20px; font-size: 10px; }
+    section{ margin-bottom: 48px; scroll-margin-top: 60px; }
+    h2{ font-size: 1.7rem; } h3{ font-size: 1.25rem; }
+    p, p.lead{ max-width: none; } p.lead{ font-size: 1.1rem; }
+    p.pull{ font-size: 1.22rem; padding-left: 16px; }
+    .note{ padding: 15px 16px; }
+    .mod summary{ padding: 14px 16px; gap: 12px; }
+    .mod .mt{ font-size: 1.02rem; }
+    .mod .body{ padding: 4px 16px 18px; }
+    nav.toc{ padding: 0; margin-bottom: 34px; }
+    nav.toc .navbtn{ display: flex; padding: 13px 0; flex: 1; }
+    nav.toc .links{ position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 0;
+      background: var(--paper); border-bottom: 1px solid var(--line-dk); box-shadow: 0 14px 24px -10px var(--shadow);
+      max-height: 0; overflow: hidden; transition: max-height .32s ease; padding: 0 18px; }
+    nav.toc.open .links{ max-height: 80vh; overflow-y: auto; padding: 6px 18px 12px; }
+    nav.toc .links a{ font-size: 12px; padding: 11px 6px; border: none; border-bottom: 1px solid var(--line); border-radius: 0; white-space: normal; }
+    nav.toc .links a:last-child{ border-bottom: none; }
+    table.tbl{ min-width: 520px; }
+    .colophon{ font-size: 10px; }
+    footer .reflist{ columns: 1; }
+  }
+  @media (max-width: 400px){ h1.title{ font-size: 2.1rem; } nav.toc .navbtn .lbl{ font-size: 10px; } }
+
+  /* reduced-motion + print + no-JS: settle every diagram to its final static state */
+  @media (prefers-reduced-motion: reduce){
+    *{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    figure{ opacity: 1 !important; transform: none !important; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+    .flow-trace{ display: none !important; }
+    .spin-star{ transform: none !important; }
+  }
+  @media print{
+    figure{ opacity: 1 !important; transform: none !important; break-inside: avoid; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+    .flow-trace{ display: none !important; }
+  }
+  @media (scripting: none){
+    figure{ opacity: 1 !important; transform: none !important; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+  }
+"""
 
 
 def build_css(theme: dict[str, str]) -> str:
-    root_vars = _theme_vars(theme)
-    dark_vars = _theme_vars(DARK_THEME)
-    return f"""  :root {{
-{root_vars}
-    --shadow: 12px 16px 40px -24px rgba(40,28,12,.55);
-    --ease: cubic-bezier(.22,.61,.36,1);
-  }}
-  html[data-theme="dark"] {{
-{dark_vars}
-    --shadow: 12px 16px 44px -22px rgba(0,0,0,.7);
-  }}
-
-  * {{ box-sizing: border-box; }}
-  html {{ scroll-behavior: smooth; }}
-  @media (prefers-reduced-motion: reduce) {{ html {{ scroll-behavior: auto; }} }}
-  body {{
-    margin: 0; color: var(--ink);
-    background:
-      radial-gradient(1200px 600px at 88% -8%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 60%),
-      radial-gradient(900px 500px at -5% 6%, color-mix(in oklab, var(--teal) 8%, transparent), transparent 55%),
-      var(--paper);
-    font-family: var(--serif); font-size: 18px; line-height: 1.72;
-    -webkit-font-smoothing: antialiased;
-    transition: background-color .35s ease, color .35s ease;
-  }}
-
-  #progress {{ position: fixed; top: 0; left: 0; height: 3px; width: 0%; z-index: 60;
-    background: linear-gradient(90deg, var(--accent), var(--plum)); transition: width .12s linear; }}
-
-  .controls {{ position: fixed; top: 16px; right: 18px; z-index: 60; display: flex; gap: 10px; align-items: center; }}
-  @media (max-width: 720px){{ .controls {{ position: static; justify-content: flex-end; padding: 14px 18px 0; }} }}
-
-  .seg {{ display: inline-flex; border: 1px solid var(--hair-2); border-radius: 999px; overflow: hidden;
-    font-family: var(--mono); font-size: 11.5px; background: var(--paper-2); }}
-  .seg button {{ background: transparent; border: 0; padding: 7px 13px; color: var(--ink-3); cursor: pointer;
-    letter-spacing: .03em; transition: background .2s, color .2s; }}
-  .seg button:hover {{ color: var(--ink); }}
-  .seg button[aria-pressed="true"] {{ background: var(--accent); color: #fff; }}
-  html[data-theme="dark"] .seg button[aria-pressed="true"] {{ color: #16150f; }}
-
-  .toggle {{ font-family: var(--mono); font-size: 12px; letter-spacing: .03em;
-    display: inline-flex; align-items: center; gap: 7px;
-    background: var(--paper-2); color: var(--ink-2);
-    border: 1px solid var(--hair-2); border-radius: 999px; padding: 7px 13px; cursor: pointer;
-    transition: color .2s, border-color .2s, transform .2s; }}
-  .toggle:hover {{ color: var(--accent); border-color: var(--accent); transform: translateY(-1px); }}
-  .toggle svg {{ width: 14px; height: 14px; }}
-
-  .wrap {{ max-width: 1180px; margin: 0 auto; padding: 0 32px; }}
-  .layout {{ display: grid; grid-template-columns: 244px minmax(0,1fr); gap: 64px; align-items: start; }}
-  @media (max-width: 940px) {{ .layout {{ grid-template-columns: 1fr; gap: 0; }} nav.toc {{ display: none; }} }}
-
-  header.mast {{ padding: 78px 0 40px; border-bottom: 1px solid var(--hair); position: relative; }}
-  header.mast .kicker {{ font-family: var(--mono); font-size: 12.5px; letter-spacing: .26em; text-transform: uppercase; color: var(--accent); }}
-  header.mast h1 {{ font-family: var(--sans); font-weight: 600; font-size: clamp(40px, 7vw, 78px); line-height: .98; letter-spacing: -.025em; margin: 20px 0 0; }}
-  header.mast h1 .amp {{ color: var(--accent); font-weight: 400; }}
-  header.mast .lede {{ font-size: clamp(19px, 2.4vw, 23px); line-height: 1.5; color: var(--ink-2); max-width: 36ch; margin: 26px 0 0; }}
-  header.mast .depthnote {{ margin-top: 20px; font-family: var(--sans); font-size: 13.5px; color: var(--ink-3); max-width: 60ch; }}
-  header.mast .depthnote b {{ color: var(--ink-2); font-weight: 600; }}
-
-  nav.toc {{ position: sticky; top: 0; align-self: start; padding-top: 78px; height: 100vh; overflow-y: auto; }}
-  nav.toc .toc-title {{ font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 14px; }}
-  nav.toc ol {{ list-style: none; margin: 0; padding: 0; counter-reset: toc; }}
-  nav.toc li {{ counter-increment: toc; }}
-  nav.toc a {{ font-family: var(--sans); display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline;
-    padding: 6px 0; color: var(--ink-3); text-decoration: none; font-size: 14px; line-height: 1.3; transition: color .18s; }}
-  nav.toc a::before {{ content: counter(toc, decimal-leading-zero); font-family: var(--mono); font-size: 11px; color: var(--hair-2); transition: color .18s; }}
-  nav.toc a:hover {{ color: var(--ink); }}
-  nav.toc a.active {{ color: var(--accent); }}
-  nav.toc a.active::before {{ color: var(--accent); }}
-
-  main {{ padding-top: 56px; padding-bottom: 120px; min-width: 0; }}
-  section {{ margin-bottom: 84px; scroll-margin-top: 24px; }}
-  .sec-no {{ font-family: var(--mono); font-size: 12.5px; letter-spacing: .2em; color: var(--accent); display: block; margin-bottom: 10px; }}
-  h2 {{ font-family: var(--sans); font-weight: 600; font-size: clamp(27px, 3.6vw, 37px); letter-spacing: -.02em; line-height: 1.06; margin: 0; }}
-  h3 {{ font-family: var(--sans); font-weight: 600; font-size: 19px; letter-spacing: -.01em; margin: 38px 0 4px; }}
-  .section-sub {{ font-style: italic; color: var(--ink-2); font-size: 18px; margin: 12px 0 26px; max-width: 64ch; }}
-  p {{ margin: 16px 0; max-width: 68ch; }}
-  a {{ color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }}
-  strong {{ font-weight: 600; }}
-  code {{ font-family: var(--mono); font-size: .8em; background: var(--paper-2); border: 1px solid var(--hair); padding: 1px 6px; border-radius: 5px; color: var(--accent-d); white-space: nowrap; }}
-
-  .tbl {{ margin: 22px 0; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; background: var(--paper-2); }}
-  table {{ border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 14.5px; }}
-  th, td {{ text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--hair); vertical-align: top; line-height: 1.45; }}
-  th {{ font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; background: var(--paper-3); }}
-  tbody tr:last-child td {{ border-bottom: none; }}
-  tbody tr:hover {{ background: color-mix(in oklab, var(--accent) 5%, transparent); }}
-  td code {{ white-space: normal; }}
-
-  figure {{ margin: 30px 0; }}
-  .fig-shell {{ border: 1px solid var(--hair); border-radius: 16px; background:
-      linear-gradient(180deg, color-mix(in oklab, var(--paper-2) 70%, transparent), var(--paper-2));
-    padding: 22px 22px 18px; box-shadow: var(--shadow); }}
-  .fig-head {{ display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }}
-  .fig-head .lab {{ font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }}
-  .fig svg {{ width: 100%; height: auto; display: block; }}
-  figcaption {{ font-family: var(--sans); font-size: 13.5px; color: var(--ink-2); margin-top: 14px; min-height: 1.4em; line-height: 1.5; }}
-  figcaption .pin {{ color: var(--accent); font-weight: 600; }}
-
-  /* ---- progressive-disclosure tiers ---- */
-  .tier {{ display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: 0;
-    transition: grid-template-rows .45s var(--ease), opacity .35s ease, margin-top .45s var(--ease); }}
-  .tier > .tier-in {{ overflow: hidden; min-height: 0; }}
-  html[data-depth="1"] .tier1, html[data-depth="2"] .tier1 {{ grid-template-rows: 1fr; opacity: 1; margin-top: 22px; }}
-  html[data-depth="2"] .tier2 {{ grid-template-rows: 1fr; opacity: 1; margin-top: 16px; }}
-  @media (prefers-reduced-motion: reduce) {{ .tier {{ transition: none; }} }}
-
-  .tier1 .tier-in {{ border-left: 2px solid var(--accent); padding: 4px 0 4px 20px; }}
-  .tier-lab {{ font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 10px; }}
-  .tier1 p, .tier1 li {{ font-family: var(--sans); font-size: 15px; }}
-  .tier1 p {{ max-width: 66ch; }}
-
-  .cites {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
-  .cite-lab {{ font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }}
-  .cite {{ font-family: var(--mono); font-size: 11.5px; display: inline-flex; align-items: center; gap: 7px;
-    border: 1px solid var(--hair-2); border-radius: 7px; padding: 4px 9px 4px 7px; color: var(--ink-2);
-    background: var(--paper-2); cursor: help; transition: border-color .18s, color .18s, transform .18s; }}
-  .cite:hover {{ transform: translateY(-1px); color: var(--ink); }}
-  .cite::before {{ font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-    padding: 2px 5px; border-radius: 4px; color: #fff; }}
-  html[data-theme="dark"] .cite::before {{ color: #16150f; }}
-  .cite[data-t="spec"]::before {{ content: "spec"; background: var(--accent); }}
-  .cite[data-t="spec"]:hover {{ border-color: var(--accent); }}
-  .cite[data-t="code"]::before {{ content: "code"; background: var(--teal); }}
-  .cite[data-t="code"]:hover {{ border-color: var(--teal); }}
-  .cite[data-t="doc"]::before  {{ content: "doc";  background: var(--plum); }}
-  .cite[data-t="doc"]:hover  {{ border-color: var(--plum); }}
-
-  /* coverage matrix (intent vs reality) */
-  .coverage {{ border: 1px solid var(--hair-2); border-radius: 12px; overflow: hidden; margin: 22px 0; }}
-  .cov-head, .cov-row {{ display: grid; grid-template-columns: 1.4fr .9fr 2fr; gap: 14px; padding: 12px 16px; align-items: start; }}
-  .cov-head {{ font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); background: var(--paper-2); }}
-  .cov-row {{ border-top: 1px solid var(--hair-2); }}
-  .cov-area {{ font-family: var(--sans); font-weight: 600; font-size: 14.5px; }}
-  .cov-note {{ font-weight: 400; font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }}
-  .cov-srcs {{ display: flex; flex-wrap: wrap; gap: 6px; }}
-  .cov-pill {{ font-family: var(--mono); font-size: 10.5px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }}
-  .cov-spec_backed {{ background: color-mix(in srgb, var(--teal) 18%, transparent); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 40%, transparent); }}
-  .cov-specced_only {{ background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 38%, transparent); }}
-  .cov-implemented_only {{ background: color-mix(in srgb, var(--plum) 16%, transparent); color: var(--plum); border-color: color-mix(in srgb, var(--plum) 38%, transparent); }}
-  .cov-unknown {{ background: var(--paper-2); color: var(--ink-3); border-color: var(--hair-2); }}
-
-  .box {{ border-radius: 13px; padding: 18px 20px; margin: 24px 0; font-family: var(--sans); font-size: 15.5px; line-height: 1.55; border: 1px solid; position: relative; max-width: 70ch; }}
-  .box .tag {{ font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 7px; }}
-  .box p {{ margin: 0; max-width: none; font-family: var(--sans); }}
-  .box.decision {{ background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 35%, var(--hair)); }}
-  .box.decision .tag {{ color: var(--accent); }}
-  .box.unspec {{ background: var(--ochre-soft); border-color: color-mix(in oklab, var(--ochre) 35%, var(--hair)); }}
-  .box.unspec .tag {{ color: var(--ochre); }}
-  .box.hist {{ background: var(--plum-soft); border-color: color-mix(in oklab, var(--plum) 32%, var(--hair)); }}
-  .box.hist .tag {{ color: var(--plum); }}
-
-  .reveal {{ opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }}
-  .reveal.in {{ opacity: 1; transform: none; }}
-  @media (prefers-reduced-motion: reduce) {{ .reveal {{ opacity: 1; transform: none; }} }}
-
-  /* svg shared */
-  .d-panel {{ fill: var(--paper); stroke: var(--hair-2); }}
-  .d-panel-2 {{ fill: var(--paper-3); stroke: var(--hair-2); }}
-  .d-node {{ fill: var(--paper); stroke: var(--hair-2); transition: fill .18s, stroke .18s; }}
-  .d-node.act {{ cursor: pointer; }}
-  .d-node.act:hover {{ fill: var(--accent-soft); stroke: var(--accent); }}
-  .d-flow {{ fill: none; stroke: var(--hair-2); stroke-width: 1.6; }}
-  .d-flow-em {{ fill: none; stroke: var(--accent); stroke-width: 2; }}
-  text.t {{ font-family: var(--sans); fill: var(--ink); }}
-  text.tm {{ font-family: var(--mono); fill: var(--ink-2); }}
-  text.tlab {{ font-family: var(--mono); fill: var(--ink-3); letter-spacing: .12em; }}
-  text.acc {{ fill: var(--accent); }}
-
-  footer {{ border-top: 1px solid var(--hair); padding: 34px 0 90px; color: var(--ink-3); font-family: var(--sans); font-size: 13.5px; }}"""
+    root = ":root{\n" + _theme_vars(theme) + "\n  --ease: cubic-bezier(.22,.61,.36,1);\n}\n"
+    return _FONT_IMPORT + root + _STATIC_CSS
 
 
-# ──────────────────────────── diagram → SVG layout ──────────────────────────
-# Each layout is a pure function (DiagramGraph) -> SVG markup with FIXED, hand-laid
-# coordinates. No physics, no randomness: same graph → same bytes. Every colour is a
-# CSS var so a theme change needs no re-layout (DESIGN §6). Nodes with a caption get
-# data-cap (hover-to-explain); nodes with a target get data-target (click-to-jump).
+# ────────────────────────── diagram → SVG layout ────────────────────────────
+# Each layout is a pure function (DiagramGraph) -> (svg-body, width, height) with FIXED,
+# hand-laid coordinates. No physics, no randomness: same graph → same bytes. Every colour
+# is a CSS var so a theme change needs no re-layout. Nodes with a caption get data-cap
+# (hover-to-explain); nodes with a target get data-target (click-to-jump). Each layout also
+# tags its elements with the motion-hook classes its prescribed animation keys off.
 
-_NS_ARROW_FWD = "var(--accent)"
-_NS_ARROW_MUTED = "var(--hair-2)"
+# Diagram palette — LITERAL hex/font values, emitted INLINE on every SVG element (mirrors the
+# visual contract skill/templates/storybook.html). Diagram internals use this fixed warm palette
+# and are not --theme-retinted; the rest of the page still themes via CSS variables.
+_DINK = "#16140f"
+_DMUT = "#3a3324"
+_DFAINT = "#7d705a"
+_DGOLD = "#a8742a"
+_DGOLDB = "#cf9a3c"
+_DPAPER = "#f4f0e6"
+_DPANEL = "#fbf9f2"
+_DLINE = "#cdc4ad"
+_DLINEDK = "#b3a98d"
+_DBLUE = "#2c4a63"
+_DRED = "#9b3022"
+_DGREEN = "#3f5d3a"
+_FMONO = "'Spline Sans Mono', ui-monospace, Menlo, monospace"
+_FDISP = "'Fraunces', Georgia, serif"
+
+# cls → text fill (emitted inline, not via CSS class).
+_CLS_FILL = {"t": _DINK, "tm": _DMUT, "tlab": _DFAINT, "tm acc": _DGOLD, "acc": _DGOLD}
+_CLS_SPACE = {"tlab": ".12em"}
 
 
-def _node_attrs(node: DiagramNode) -> str:
-    """Common interactivity attributes for an interactive node group."""
-    attrs = ['class="d-node act"']
+def _node_group_open(node: DiagramNode, extra: str = "") -> str:
+    """Open an interactive node <g> carrying the motion-hook + hover/jump data attributes.
+    Visual fill/stroke/font live INLINE on the child shapes/text, not on this group."""
+    cls = "d-node act" + ((" " + extra) if extra else "")
+    attrs = [f'class="{cls}"']
     if node.caption:
         attrs.append(f'data-cap="{esc(node.caption)}"')
     if node.target:
-        # target is a section id; the click handler scrolls to #<id>.
         attrs.append(f'data-target="#{esc(node.target)}"')
-    return " ".join(attrs)
+    return f"<g {' '.join(attrs)}>"
 
 
-def _svg_text(x: float, y: float, cls: str, size: float, text: str, *, anchor: str = "start") -> str:
+def _svg_text(x: float, y: float, cls: str, size: float, text: str, *,
+              anchor: str = "start", weight: Optional[int] = None,
+              font: str = _FMONO, fill: Optional[str] = None) -> str:
+    """A diagram text label — font-family + fill emitted INLINE (literal) for portability."""
+    f = fill or _CLS_FILL.get(cls, _DMUT)
+    sp = _CLS_SPACE.get(cls)
     a = f' text-anchor="{anchor}"' if anchor != "start" else ""
-    return f'<text class="{cls}" x="{x:g}" y="{y:g}" font-size="{size:g}"{a}>{esc(text)}</text>'
+    w = f' font-weight="{weight}"' if weight else ""
+    s = f' letter-spacing="{sp}"' if sp else ""
+    return (f'<text x="{x:g}" y="{y:g}" font-family="{font}" font-size="{size:g}" '
+            f'fill="{f}"{w}{s}{a}>{esc(text)}</text>')
+
+
+def _rect(x: float, y: float, w: float, h: float, rx: int, *,
+          fill: str = _DPANEL, stroke: str = _DLINEDK) -> str:
+    return (f'<rect x="{x:g}" y="{y:g}" width="{w:g}" height="{h:g}" rx="{rx}" '
+            f'fill="{fill}" stroke="{stroke}"/>')
 
 
 def _markers(fig_id: str) -> str:
-    """Per-figure arrowhead markers (unique ids so multiple SVGs coexist)."""
     return (
-        f'<defs>'
+        f"<defs>"
         f'<marker id="{fig_id}-af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
-        f'<path d="M0,0 L8,4.5 L0,9 z" fill="{_NS_ARROW_FWD}"/></marker>'
+        f'<path d="M0,0 L8,4.5 L0,9 z" fill="{_DGOLD}"/></marker>'
         f'<marker id="{fig_id}-am" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">'
-        f'<path d="M0,0 L8,4.5 L0,9 z" fill="{_NS_ARROW_MUTED}"/></marker>'
-        f'</defs>'
+        f'<path d="M0,0 L8,4.5 L0,9 z" fill="{_DLINEDK}"/></marker>'
+        f"</defs>"
     )
 
 
-def _layout_pipeline(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
-    """Nodes laid out left→right as a horizontal pipeline; edges connect in sequence.
+def _edge_path(d: str, fig_id: str, emphasis: bool, *, cls: str = "") -> str:
+    stroke = _DGOLD if emphasis else _DLINEDK
+    width = 2 if emphasis else 1.6
+    marker = f"{fig_id}-af" if emphasis else f"{fig_id}-am"
+    c = f' class="{cls}"' if cls else ""
+    return (f'<path{c} d="{d}" fill="none" stroke="{stroke}" stroke-width="{width:g}" '
+            f'marker-end="url(#{marker})"/>')
 
-    Edges are drawn by node id where both endpoints exist; an edge with emphasis uses
-    the accent flow + filled arrowhead. Labels ride above the connector.
-    """
+
+def _ai(i: int) -> str:
+    """Stagger-delay class for index i (clamped to the defined a0..a11 set)."""
+    return f"a{min(i, 11)}"
+
+
+def _layout_pipeline(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """Nodes left→right as a horizontal pipeline; stages illuminate in sequence."""
     n = len(graph.nodes)
-    nw, nh, gap = 150, 64, 60
-    margin_x, top = 30, 70
-    width = margin_x * 2 + n * nw + max(0, n - 1) * gap
+    width, margin_x, top, nh, gap = 1000, 40, 70, 64, 28
+    nw = (width - 2 * margin_x - max(0, n - 1) * gap) / max(1, n)
     height = top + nh + 70
-    cx: dict[str, tuple[float, float]] = {}
+    pos: dict[str, tuple[float, float]] = {}
     parts = [_markers(fig_id)]
     for i, node in enumerate(graph.nodes):
         x = margin_x + i * (nw + gap)
         y = top
-        cx[node.id] = (x, y)
-        parts.append(f'<g {_node_attrs(node)}>')
-        parts.append(f'<rect x="{x:g}" y="{y:g}" width="{nw}" height="{nh}" rx="12" class="d-panel"/>')
+        pos[node.id] = (x, y)
+        parts.append(_node_group_open(node, f"anim {_ai(i)}"))
+        parts.append(_rect(x, y, nw, nh, 12))
         parts.append(_svg_text(x + nw / 2, y + nh / 2 + 4, "tm", 12, node.label, anchor="middle"))
-        parts.append('</g>')
-    parts.append(_edges_horizontal(graph.edges, cx, fig_id, nw, nh))
+        parts.append("</g>")
+    parts.append(_edges_horizontal(graph.edges, pos, fig_id, nw, nh))
     return "".join(parts), width, height
 
 
 def _layout_flow(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
-    """A decision/flow: nodes stacked vertically down the centre, connected top→bottom.
-
-    Generic enough for branching narratives; emphasis edges use the accent stroke.
-    """
+    """Nodes stacked down the centre, connected top→bottom; a comet traces the spine."""
     n = len(graph.nodes)
     nw, nh, gap = 280, 56, 46
-    top, margin_x = 24, 30
-    width = 940
-    cx = (width) / 2
+    top = 24
+    width = 1000
+    cx = width / 2
     height = top + n * nh + max(0, n - 1) * gap + 40
     pos: dict[str, tuple[float, float]] = {}
     parts = [_markers(fig_id)]
@@ -385,48 +533,43 @@ def _layout_flow(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
         x = cx - nw / 2
         pos[node.id] = (x, y)
         rx = 26 if i == 0 or i == n - 1 else 12
-        parts.append(f'<g {_node_attrs(node)}>')
-        parts.append(f'<rect x="{x:g}" y="{y:g}" width="{nw}" height="{nh}" rx="{rx}" class="d-panel"/>')
+        parts.append(_node_group_open(node, f"anim {_ai(i)}"))
+        parts.append(_rect(x, y, nw, nh, rx))
         parts.append(_svg_text(cx, y + nh / 2 + 4, "t", 13, node.label, anchor="middle"))
-        parts.append('</g>')
+        parts.append("</g>")
     parts.append(_edges_vertical(graph.edges, pos, fig_id, nw, nh, cx))
+    if n >= 2:
+        y0 = top + nh
+        y1 = top + (n - 1) * (nh + gap)
+        parts.append(f'<path class="flow-trace" d="M{cx:g} {y0:g} V {y1:g}" fill="none"/>')
     return "".join(parts), width, height
 
 
 def _layout_ladder(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
-    """An ordered, rising ladder: rank-0 low-left climbing to rank-N high-right.
-
-    Each rung shows its rank index + label; the terminal rung is accent-outlined.
-    Connectors run rung→rung. Matches the north-star's Fig. 3.
-    """
+    """An ordered, rising ladder; rungs draw in order, terminal rung accent-outlined."""
     n = len(graph.nodes)
     if n == 0:
         return _markers(fig_id), 940, 120
-    width = 940
+    width = 1000
     x0, w, rh = 40, 96, 38
     base_y, rise = 40 + (n - 1) * 22, 22
     height = base_y + rh + 40
     span = width - x0 - w - 30
     gap = span / (n - 1) if n > 1 else 0
-    pos: dict[str, tuple[float, float]] = {}
     parts = [_markers(fig_id)]
-    # baseline rule
-    parts.append(f'<line x1="{x0}" y1="{base_y + rh + 14:g}" x2="{width - 30}" y2="{base_y + rh + 14:g}" stroke="var(--hair)"/>')
+    parts.append(f'<line x1="{x0}" y1="{base_y + rh + 14:g}" x2="{width - 30}" y2="{base_y + rh + 14:g}" stroke="{_DLINE}"/>')
     for i, node in enumerate(graph.nodes):
         x = x0 + i * gap
         y = base_y - i * rise
-        pos[node.id] = (x, y)
         terminal = i == n - 1
-        stroke = ' stroke="var(--accent)"' if terminal else ""
-        parts.append(f'<g {_node_attrs(node)}>')
-        parts.append(f'<rect x="{x:g}" y="{y:g}" width="{w}" height="{rh}" rx="8" class="d-node"{stroke}/>')
+        parts.append(_node_group_open(node, f"anim {_ai(i)}"))
+        parts.append(_rect(x, y, w, rh, 8, stroke=_DGOLD if terminal else _DLINEDK))
         parts.append(_svg_text(x + 9, y + 15, "tlab", 9, str(i)))
-        cls = "tm acc" if terminal else "tm"
-        parts.append(f'<text class="{cls}" x="{x + 9:g}" y="{y + 30:g}" font-size="9.5">{esc(node.label)}</text>')
-        parts.append('</g>')
+        parts.append(_svg_text(x + 9, y + 30, "tm acc" if terminal else "tm", 9.5, node.label))
+        parts.append("</g>")
         if i < n - 1:
             nx = x0 + (i + 1) * gap
-            parts.append(f'<path class="d-flow" d="M{x + w:g} {y + rh / 2:g} H {nx:g}" marker-end="url(#{fig_id}-am)"/>')
+            parts.append(_edge_path(f"M{x + w:g} {y + rh / 2:g} H {nx:g}", fig_id, False))
     return "".join(parts), width, height
 
 
@@ -440,13 +583,11 @@ def _edges_horizontal(edges: list[DiagramEdge], pos: dict[str, tuple[float, floa
         dx, dy = pos[e.dst]
         x1, y1 = sx + nw, sy + nh / 2
         x2, y2 = dx, dy + nh / 2
-        cls = "d-flow-em" if e.emphasis else "d-flow"
-        marker = f"{fig_id}-af" if e.emphasis else f"{fig_id}-am"
         midx = (x1 + x2) / 2
-        parts.append(f'<path class="{cls}" d="M{x1:g} {y1:g} C {midx:g} {y1:g}, {midx:g} {y2:g}, {x2:g} {y2:g}" marker-end="url(#{marker})"/>')
+        d = f"M{x1:g} {y1:g} C {midx:g} {y1:g}, {midx:g} {y2:g}, {x2:g} {y2:g}"
+        parts.append(_edge_path(d, fig_id, e.emphasis))
         if e.label:
-            lcls = "tm acc" if e.emphasis else "tm"
-            parts.append(f'<text class="{lcls}" x="{midx:g}" y="{min(y1, y2) - 8:g}" font-size="10.5" text-anchor="middle">{esc(e.label)}</text>')
+            parts.append(_svg_text(midx, min(y1, y2) - 8, "tm acc" if e.emphasis else "tm", 10.5, e.label, anchor="middle"))
     return "".join(parts)
 
 
@@ -458,33 +599,23 @@ def _edges_vertical(edges: list[DiagramEdge], pos: dict[str, tuple[float, float]
             continue
         sx, sy = pos[e.src]
         dx, dy = pos[e.dst]
-        x1, y1 = cx, sy + nh
-        x2, y2 = cx, dy
-        cls = "d-flow-em" if e.emphasis else "d-flow"
-        marker = f"{fig_id}-af" if e.emphasis else f"{fig_id}-am"
-        parts.append(f'<path class="{cls}" d="M{x1:g} {y1:g} V {y2:g}" marker-end="url(#{marker})"/>')
+        y1 = sy + nh
+        y2 = dy
+        parts.append(_edge_path(f"M{cx:g} {y1:g} V {y2:g}", fig_id, e.emphasis))
         if e.label:
-            lcls = "tm acc" if e.emphasis else "tm"
-            parts.append(f'<text class="{lcls}" x="{cx + 10:g}" y="{(y1 + y2) / 2 + 4:g}" font-size="10.5">{esc(e.label)}</text>')
+            parts.append(_svg_text(cx + 10, (y1 + y2) / 2 + 4, "tm acc" if e.emphasis else "tm", 10.5, e.label))
     return "".join(parts)
 
 
 def _layout_mapping(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
-    """Two columns connected left→right by edges — a "this maps to that" table.
-
-    The node set is split by edge direction: every node that is some edge's src
-    sits in the left column, every node that is some edge's dst in the right;
-    a node that is both (or neither) defaults left. Rows align by first
-    appearance, so an edge draws a clean horizontal connector across the gap.
-    Matches the north-star's Fig. 2 (filesystem → tracker mapping).
-    """
+    """Two columns connected left→right; left appears, links draw, right appears."""
     srcs = [n for n in graph.nodes if any(e.src == n.id for e in graph.edges)]
     dsts = [n for n in graph.nodes if any(e.dst == n.id for e in graph.edges)
             and not any(e.src == n.id for e in graph.edges)]
     leftovers = [n for n in graph.nodes if n not in srcs and n not in dsts]
     left, right = srcs + leftovers, dsts
     rows = max(len(left), len(right), 1)
-    width = 940
+    width = 1000
     nw, nh, vgap = 300, 38, 10
     lx, rx, top = 40, width - 40 - nw, 50
     height = top + rows * (nh + vgap) + 20
@@ -492,35 +623,30 @@ def _layout_mapping(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
     parts = [_markers(fig_id)]
     parts.append(_svg_text(lx, 34, "tlab", 11, "FROM"))
     parts.append(_svg_text(rx, 34, "tlab", 11, "TO"))
-    for col, x in ((left, lx), (right, rx)):
+    for col, x, klass in ((left, lx, "lm-l"), (right, rx, "lm-r")):
         for i, node in enumerate(col):
             y = top + i * (nh + vgap)
             pos[node.id] = (x, y)
-            parts.append(f'<g {_node_attrs(node)}>')
-            parts.append(f'<rect x="{x:g}" y="{y:g}" width="{nw}" height="{nh}" rx="9" class="d-node"/>')
+            extra = f"{klass} {_ai(i)}" if klass == "lm-l" else klass
+            parts.append(_node_group_open(node, extra))
+            parts.append(_rect(x, y, nw, nh, 9))
             parts.append(_svg_text(x + 16, y + nh / 2 + 4, "tm", 12, node.label))
-            parts.append('</g>')
+            parts.append("</g>")
     for e in graph.edges:
         if e.src not in pos or e.dst not in pos:
             continue
         sx, sy = pos[e.src]
         dx, dy = pos[e.dst]
-        cls = "d-flow-em" if e.emphasis else "d-flow"
-        marker = f"{fig_id}-af" if e.emphasis else f"{fig_id}-am"
-        parts.append(f'<path class="{cls}" d="M{sx + nw:g} {sy + nh / 2:g} H {dx:g}" marker-end="url(#{marker})"/>')
+        parts.append(_edge_path(f"M{sx + nw:g} {sy + nh / 2:g} H {dx:g}", fig_id, e.emphasis, cls="lm-k"))
     return "".join(parts), width, height
 
 
 def _layout_panel(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
-    """A responsive grid of labelled boxes — a components/areas overview.
-
-    Edges are ignored (a panel is a set, not a flow); each node is a card that
-    keeps its hover caption + click-to-jump. Three columns, wrapping by count.
-    """
+    """A responsive grid of labelled cards; cards stagger-fade in (a set, not a flow)."""
     n = len(graph.nodes)
     if n == 0:
         return _markers(fig_id), 940, 100
-    width = 940
+    width = 1000
     cols = 3 if n > 4 else max(1, n)
     cw, ch, gx, gy = (width - 40 * 2 - (cols - 1) * 20) / cols, 70, 20, 20
     margin_x, top = 40, 30
@@ -531,91 +657,188 @@ def _layout_panel(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
         r, c = divmod(i, cols)
         x = margin_x + c * (cw + gx)
         y = top + r * (ch + gy)
-        parts.append(f'<g {_node_attrs(node)}>')
-        parts.append(f'<rect x="{x:g}" y="{y:g}" width="{cw:g}" height="{ch}" rx="11" class="d-panel"/>')
-        parts.append(f'<text class="t" x="{x + 16:g}" y="{y + 28:g}" font-size="13" font-weight="600">{esc(node.label)}</text>')
+        parts.append(_node_group_open(node, f"anim {_ai(i)}"))
+        parts.append(_rect(x, y, cw, ch, 11))
+        parts.append(_svg_text(x + 16, y + 28, "t", 12.5, node.label, weight=500))
         if node.caption:
-            # caption wraps to a second line inside the card (truncated to fit)
             cap = node.caption if len(node.caption) <= 46 else node.caption[:45] + "…"
-            parts.append(f'<text class="tm" x="{x + 16:g}" y="{y + 48:g}" font-size="10.5">{esc(cap)}</text>')
-        parts.append('</g>')
+            parts.append(_svg_text(x + 16, y + 48, "tm", 10.5, cap))
+        parts.append("</g>")
     return "".join(parts), width, height
 
 
-# Registry of hand-laid diagram layouts. The renderer falls back to `flow` for any
-# layout not present, so a new layout value never crashes a build — it degrades to a
-# generic, still-correct stacked rendering.
+def _layout_hub(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """A central core with radiating nodes: core pops, spokes draw out, nodes fade, ring sweeps.
+
+    Convention: the FIRST node is the core; the rest radiate around it.
+    """
+    nodes = graph.nodes
+    if not nodes:
+        return _markers(fig_id), 1000, 300
+    core, outer = nodes[0], nodes[1:]
+    width, height = 1000, 420
+    cx, cy, ring_r, core_r, spoke_r = 500, 210, 104, 78, 172
+    nw, nh = 160, 44
+    parts = [
+        f'<defs><radialGradient id="{fig_id}-hub" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="{_DGOLDB}"/><stop offset="1" stop-color="{_DGOLD}"/>'
+        f"</radialGradient></defs>"
+    ]
+    m = max(1, len(outer))
+    placed: list[tuple[DiagramNode, float, float]] = []
+    for i, node in enumerate(outer):
+        ang = -math.pi / 2 + (2 * math.pi * i / m)
+        x = round(cx + spoke_r * math.cos(ang), 2)
+        y = round(cy + spoke_r * math.sin(ang), 2)
+        placed.append((node, x, y))
+    # spokes first (under the nodes)
+    for _node, x, y in placed:
+        parts.append(f'<line class="hub-spoke" x1="{cx}" y1="{cy}" x2="{x:g}" y2="{y:g}" stroke="{_DLINEDK}" stroke-width="1.5"/>')
+    # radial satellites
+    for node, x, y in placed:
+        parts.append(_node_group_open(node, "hub-node"))
+        parts.append(_rect(x - nw / 2, y - nh / 2, nw, nh, 6))
+        parts.append(_svg_text(x, y + 5, "tm", 12, node.label, anchor="middle", fill=_DINK))
+        parts.append("</g>")
+    # ring + gradient core
+    parts.append(f'<circle class="hub-ring" cx="{cx}" cy="{cy}" r="{ring_r}" fill="none" stroke="{_DBLUE}" stroke-width="2.5" stroke-dasharray="7 6"/>')
+    parts.append(_node_group_open(core, "hub-core"))
+    parts.append(f'<circle cx="{cx}" cy="{cy}" r="{core_r}" fill="url(#{fig_id}-hub)"/>')
+    parts.append(_svg_text(cx, cy + 6, "t", 18, core.label, anchor="middle", font=_FDISP, weight=600, fill="#fffaf0"))
+    parts.append("</g>")
+    return "".join(parts), width, height
+
+
+def _layout_stack(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """Layered architecture; layers build bottom-up (first node = top layer in reading order)."""
+    nodes = graph.nodes
+    n = len(nodes)
+    if n == 0:
+        return _markers(fig_id), 760, 120
+    width = 1000
+    lh, gap, top = 46, 12, 30
+    height = top + n * (lh + gap)
+    tints = ["#d9e2ea", "#dce8d6", "#f0dccb"]
+    parts = [_markers(fig_id)]
+    for i, node in enumerate(nodes):
+        y = top + i * (lh + gap)
+        delay = _ai(n - 1 - i)  # bottom layer animates first
+        fill = tints[i % len(tints)]
+        parts.append(_node_group_open(node, f"stack-layer {delay}"))
+        parts.append(f'<rect x="80" y="{y:g}" width="840" height="{lh}" rx="8" fill="{fill}" stroke="{_DLINEDK}"/>')
+        parts.append(_svg_text(width / 2, y + lh / 2 + 4, "tm", 12.5, node.label, anchor="middle"))
+        parts.append("</g>")
+    return "".join(parts), width, height
+
+
+def _layout_timeline(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """An evolution timeline; line draws L→R and nodes light in chronological order (scrubbed)."""
+    nodes = graph.nodes
+    n = len(nodes)
+    if n == 0:
+        return _markers(fig_id), 1000, 160
+    width, height = 1000, 200
+    x0, x1, y = 80, 920, 110
+    gap = (x1 - x0) / (n - 1) if n > 1 else 0
+    parts = [
+        f'<defs><linearGradient id="{fig_id}-tl" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0" stop-color="{_DRED}"/><stop offset="0.6" stop-color="{_DGOLD}"/>'
+        f'<stop offset="1" stop-color="{_DGREEN}"/></linearGradient></defs>'
+    ]
+    parts.append(f'<line class="tl-line" x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" stroke="url(#{fig_id}-tl)" stroke-width="5"/>')
+    for i, node in enumerate(nodes):
+        x = round(x0 + i * gap, 2)
+        data_at = round(0.1 + 0.7 * (i / (n - 1)), 3) if n > 1 else 0.4
+        attrs = [f'class="tl-node" data-at="{data_at:g}"']
+        if node.caption:
+            attrs.append(f'data-cap="{esc(node.caption)}"')
+        if node.target:
+            attrs.append(f'data-target="#{esc(node.target)}"')
+        parts.append(f"<g {' '.join(attrs)}>")
+        parts.append(f'<circle cx="{x:g}" cy="{y}" r="8" fill="{_DGOLD}"/>')
+        parts.append(_svg_text(x, y - 18, "t", 12, node.label, anchor="middle", weight=500))
+        if node.caption:
+            cap = node.caption if len(node.caption) <= 28 else node.caption[:27] + "…"
+            parts.append(_svg_text(x, y + 30, "tlab", 11, cap, anchor="middle"))
+        parts.append("</g>")
+    return "".join(parts), width, height
+
+
+# Registry of hand-laid diagram layouts. Unknown layouts fall back to `flow`.
 _LAYOUTS = {
     "pipeline": _layout_pipeline,
     "flow": _layout_flow,
     "ladder": _layout_ladder,
     "mapping": _layout_mapping,
     "panel": _layout_panel,
+    "hub": _layout_hub,
+    "stack": _layout_stack,
+    "timeline": _layout_timeline,
 }
 
 
 def render_diagram(graph: DiagramGraph, fig_id: str) -> str:
     layout_fn = _LAYOUTS.get(graph.layout, _layout_flow)
     body, w, h = layout_fn(graph, fig_id)
-    aria = esc(f"{graph.layout} diagram with {len(graph.nodes)} nodes")
-    return (
-        f'<svg id="{fig_id}" viewBox="0 0 {w} {h}" role="img" aria-label="{aria}">'
-        f'{body}</svg>'
-    )
+    if graph.title:
+        th = 50  # room for the Fraunces title; the body is shifted down beneath it
+        title = (f'<text x="40" y="34" font-family="{_FDISP}" font-weight="600" '
+                 f'font-size="19" fill="{_DINK}">{esc(graph.title)}</text>')
+        body = title + f'<g transform="translate(0,{th})">{body}</g>'
+        h += th
+    aria = esc(graph.title or f"{graph.layout} diagram with {len(graph.nodes)} nodes")
+    return f'<svg id="{fig_id}" viewBox="0 0 {w} {h}" role="img" aria-label="{aria}">{body}</svg>'
 
 
 # ─────────────────────────────── block rendering ────────────────────────────
-
-def _cite_chips(refs: list[SourceRef]) -> str:
-    """A Layer-2 citation strip. Source-TYPED chips (data-t). The chip text/title
-    come straight from the model — the renderer never fabricates source numbers."""
-    chips = ['<span class="cite-lab">Backed by</span>']
-    for r in refs:
-        t = SOURCE_T.get(r.type, "doc")
-        title = r.name
-        if r.anchor:
-            title = f"{r.name} · {r.anchor}"
-        chips.append(f'<span class="cite" data-t="{t}" title="{esc(title)}">{esc(r.name)}</span>')
-    return (
-        '<div class="tier tier2"><div class="tier-in"><div class="cites">'
-        + "".join(chips)
-        + "</div></div></div>"
-    )
-
 
 def _render_table(rows: list[list[str]]) -> str:
     if not rows:
         return ""
     head, *body = rows
     th = "".join(f"<th>{esc(c)}</th>" for c in head)
-    trs = []
-    for row in body:
-        tds = "".join(f"<td>{esc(c)}</td>" for c in row)
-        trs.append(f"<tr>{tds}</tr>")
-    return (
-        '<div class="tbl"><table>'
-        f"<thead><tr>{th}</tr></thead>"
-        f"<tbody>{''.join(trs)}</tbody>"
-        "</table></div>"
-    )
+    trs = "".join("<tr>" + "".join(f"<td>{esc(c)}</td>" for c in r) + "</tr>" for r in body)
+    return f'<div class="tbl-scroll"><table class="tbl"><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table></div>'
+
+
+def _cite_chip(ref: SourceRef) -> str:
+    t = SOURCE_T.get(ref.type, "doc")
+    title = ref.name + (f" · {ref.anchor}" if ref.anchor else "")
+    return f'<a class="ref" href="#refs" title="{esc(title)}"><span class="cite-t {t}">{t}</span>{esc(ref.name)}</a>'
 
 
 def _render_callout(block: Block) -> str:
     kind = block.callout_kind
-    cls = CALLOUT_CLASS.get(kind, "decision")
+    variant = CALLOUT_CLASS.get(kind, "")
     tag = block.callout_tag or CALLOUT_DEFAULT_TAG.get(kind, "Note")
     body = esc(block.prose) if block.prose else ""
-    return (
-        f'<div class="box {cls}">'
-        f'<span class="tag">{esc(tag)}</span>'
-        f"<p>{body}</p>"
-        "</div>"
-    )
+    classes = "note" + ((" " + variant) if variant else "")
+    return f'<div class="{classes}"><span class="tag">{esc(tag)}</span>{body}</div>'
+
+
+def _render_coverage(rows: list) -> str:
+    """Intent-vs-reality matrix as a design-system table: area, status pill, source chips."""
+    out = ['<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Area</th><th>Coverage</th><th>Sources</th></tr></thead><tbody>']
+    for ci in rows:
+        status = ci.status.value if hasattr(ci.status, "value") else str(ci.status)
+        pill, label = COVERAGE_PILL.get(status, ("hard", esc(status)))
+        chips = "".join(_cite_chip(r) for r in (list(ci.spec_refs) + list(ci.code_refs)))
+        note = f'<div class="cov-note">{esc(ci.note)}</div>' if ci.note else ""
+        out.append(
+            f"<tr><td>{esc(ci.area)}{note}</td>"
+            f'<td><span class="pill {pill}">{label}</span></td>'
+            f'<td class="covsrc">{chips}</td></tr>'
+        )
+    out.append("</tbody></table></div>")
+    return "".join(out)
 
 
 def _render_block_core(block: Block, fig_counter: list[int]) -> str:
-    """Render a block's actual payload (no tier wrapper)."""
     if block.type is BlockType.PROSE:
+        if block.prose_style == "lead":
+            return f'<p class="lead">{esc(block.prose)}</p>'
+        if block.prose_style == "pull":
+            return f'<p class="pull">{esc(block.prose)}</p>'
         return f"<p>{esc(block.prose)}</p>"
     if block.type is BlockType.TABLE:
         return _render_table(block.table or [])
@@ -625,85 +848,43 @@ def _render_block_core(block: Block, fig_counter: list[int]) -> str:
         fig_counter[0] += 1
         n = fig_counter[0]
         fig_id = f"fig{n}"
+        layout = block.diagram.layout if block.diagram else "flow"
         svg = render_diagram(block.diagram, fig_id)
         return (
-            '<figure class="fig"><div class="fig-shell">'
-            '<div class="fig-head">'
-            f'<span class="lab">Fig. {n}</span>'
-            '<span class="lab" style="color:var(--ink-3)">hover a node &middot; click to jump</span>'
-            "</div>"
+            f'<figure class="fig fig-{esc(layout)}">'
             f"{svg}"
-            f'<figcaption id="cap-{fig_id}">'
-            '<span class="pin">Hover the nodes to explore.</span></figcaption>'
-            "</div></figure>"
+            f'<figcaption id="cap-{fig_id}"><b>Fig. {n}</b> — hover a node to explain · click to jump.</figcaption>'
+            "</figure>"
         )
     if block.type is BlockType.COVERAGE:
         return _render_coverage(block.coverage or [])
     return ""
 
 
-_COVERAGE_LABEL = {
-    "spec_backed": "Specified &amp; built",
-    # specced_only means "no implementing code was found in the SCANNED tree" —
-    # which honestly covers both genuinely-unbuilt areas and code that lives
-    # outside the scan (e.g. installed templates). The row's note disambiguates.
-    "specced_only": "Specified, not in scanned source",
-    "implemented_only": "Built, not specified",
-    "unknown": "Unknown",
-}
+def _block_refs(block: Block):
+    """Every source ref a block surfaces: its own refs PLUS any carried by its diagram
+    nodes or its coverage rows.
 
-
-def _render_coverage(rows: list) -> str:
-    """An intent-vs-reality matrix: one row per area, a status pill, and the
-    spec/code citation chips that back the classification (DESIGN §5.8)."""
-    out = ['<div class="coverage">']
-    out.append('<div class="cov-head"><span>Area</span><span>Coverage</span><span>Sources</span></div>')
-    for ci in rows:
-        status = ci.status.value if hasattr(ci.status, "value") else str(ci.status)
-        chips = "".join(
-            f'<span class="cite" data-t="{r.type.value}">{esc(r.name)}</span>'
-            for r in (list(ci.spec_refs) + list(ci.code_refs))
-        )
-        note = f'<div class="cov-note">{esc(ci.note)}</div>' if ci.note else ""
-        out.append(
-            '<div class="cov-row">'
-            f'<div class="cov-area">{esc(ci.area)}{note}</div>'
-            f'<div><span class="cov-pill cov-{status}">{_COVERAGE_LABEL.get(status, esc(status))}</span></div>'
-            f'<div class="cov-srcs">{chips}</div>'
-            "</div>"
-        )
-    out.append("</div>")
-    return "".join(out)
-
-
-def _render_block(block: Block, fig_counter: list[int]) -> str:
-    """A block, wrapped in its altitude tier.
-
-    functional → Layer 0, always visible.
-    technical  → Layer 1, inside a .tier1 wrapper (revealed at depth ≥ 1).
-    provenance → handled separately as the per-section Layer-2 citation strip.
+    Diagram nodes (schema §6) and coverage-row spec_refs/code_refs (§5.8) carry their own
+    grounding source_refs; those must surface in the per-section sources line and the
+    References appendix, not be silently dropped.
     """
-    core = _render_block_core(block, fig_counter)
-    if not core:
-        return ""
-    if block.altitude is Altitude.TECHNICAL:
-        return (
-            '<div class="tier tier1"><div class="tier-in">'
-            '<span class="tier-lab">Technical detail</span>'
-            f"{core}"
-            "</div></div>"
-        )
-    # functional (and any provenance-altitude block's payload) renders inline at Layer 0.
-    return core
+    yield from block.source_refs
+    if block.type is BlockType.DIAGRAM and block.diagram:
+        for node in block.diagram.nodes:
+            yield from node.source_refs
+    if block.type is BlockType.COVERAGE and block.coverage:
+        for ci in block.coverage:
+            yield from ci.spec_refs
+            yield from ci.code_refs
 
 
 def _collect_section_refs(section: Section) -> list[SourceRef]:
-    """Stable, de-duplicated union of every block's resolved source_refs → the
-    section's Layer-2 strip. Order preserved by first appearance (determinism)."""
+    """De-duplicated union of every block's resolved source_refs (first-appearance order)."""
     seen: set[tuple[str, str, str, str]] = set()
     ordered: list[SourceRef] = []
     for block in section.blocks:
-        for r in block.source_refs:
+        for r in _block_refs(block):
             key = (r.type.value, r.name, r.locator, r.anchor or "")
             if key not in seen:
                 seen.add(key)
@@ -711,96 +892,169 @@ def _collect_section_refs(section: Section) -> list[SourceRef]:
     return ordered
 
 
+def _source_line(refs: list[SourceRef]) -> str:
+    chips = ['<span class="srclab">Sources</span>'] + [_cite_chip(r) for r in refs]
+    return '<div class="srcline">' + "".join(chips) + "</div>"
+
+
 def _render_section(section: Section, fig_counter: list[int]) -> str:
-    parts = [f'<section id="{esc(section.id)}" class="reveal">']
-    parts.append(f'<span class="sec-no">{section.number:02d}</span>')
+    parts = [f'<section id="{esc(section.id)}">', '<span class="anchor"></span>']
+    strap = f" — {esc(section.strap)}" if section.strap else ""
+    parts.append(f'<span class="sec-num">{section.number:02d}{strap}</span>')
     parts.append(f"<h2>{esc(section.title)}</h2>")
     if section.subtitle:
-        parts.append(f'<p class="section-sub">{esc(section.subtitle)}</p>')
+        parts.append(f'<p class="lead">{esc(section.subtitle)}</p>')
+    technical: list[Block] = []
     for block in section.blocks:
-        parts.append(_render_block(block, fig_counter))
+        if block.altitude is Altitude.TECHNICAL:
+            technical.append(block)
+        else:
+            parts.append(_render_block_core(block, fig_counter))
+    if technical:
+        parts.append(f'<details class="mod" id="{esc(section.id)}-tech">')
+        parts.append('<summary><span class="mt">Technical detail</span><span class="mx">+</span></summary>')
+        parts.append('<div class="body">')
+        for block in technical:
+            parts.append(_render_block_core(block, fig_counter))
+        parts.append("</div></details>")
     refs = _collect_section_refs(section)
     if refs:
-        parts.append(_cite_chips(refs))
+        parts.append(_source_line(refs))
     parts.append("</section>")
     return "".join(parts)
 
 
 # ──────────────────────────────── page shell ────────────────────────────────
 
-def _render_toc(sections: list[Section]) -> str:
-    items = "".join(
-        f'<li><a href="#{esc(s.id)}">{esc(s.title)}</a></li>' for s in sections
+def _title_html(title: str, accent: Optional[str]) -> str:
+    if accent and accent in title:
+        i = title.index(accent)
+        return esc(title[:i]) + f"<em>{esc(accent)}</em>" + esc(title[i + len(accent):])
+    return esc(title)
+
+
+def _all_refs(doc: DocumentModel) -> list[SourceRef]:
+    seen: set[tuple[str, str, str, str]] = set()
+    ordered: list[SourceRef] = []
+    for s in doc.sections:
+        for b in s.blocks:
+            for r in _block_refs(b):
+                key = (r.type.value, r.name, r.locator, r.anchor or "")
+                if key not in seen:
+                    seen.add(key)
+                    ordered.append(r)
+    return ordered
+
+
+def _render_nav(sections: list[Section], project: str) -> str:
+    links = "".join(f'<a href="#{esc(s.id)}">{esc(s.title)}</a>' for s in sections)
+    cur = esc(sections[0].title) if sections else "Contents"
+    return (
+        '<nav class="toc" id="toc"><div class="wrap">'
+        f'<a href="#" class="brand-mark" aria-label="{esc(project)}">{GLYPH}<span class="brand-word">{esc(project)}</span></a>'
+        '<button class="navbtn" id="navbtn" aria-expanded="false" aria-controls="toclinks">'
+        '<span class="bars"><span></span><span></span><span></span></span>'
+        f'<span class="lbl">Contents · <span class="cur" id="navcur">{cur}</span></span></button>'
+        f'<div class="links" id="toclinks">{links}</div>'
+        "</div></nav>"
+    )
+
+
+def _render_footer(doc: DocumentModel, project: str) -> str:
+    refs = _all_refs(doc)
+    refitems = "".join(
+        f'<p><span class="reftype {SOURCE_T.get(r.type, "doc")}">{SOURCE_T.get(r.type, "doc")}</span>'
+        f'{esc(r.name)}{(" · " + esc(r.anchor)) if r.anchor else ""}</p>'
+        for r in refs
+    )
+    types = sorted({SOURCE_T.get(r.type, "doc") for r in refs})
+    sources = " · ".join(SOURCE_LABEL.get(t, t) for t in types) if types else "—"
+    colophon = (
+        '<table class="colophon"><tbody>'
+        f"<tr><th>Document</th><td>Architecture Storybook — {esc(project)}</td></tr>"
+        '<tr><th>Build</th><td><span class="vtag">deterministic</span></td></tr>'
+        f"<tr><th>Sources</th><td>{sources}</td></tr>"
+        "<tr><th>Gate</th><td>fail-closed · 6 checks</td></tr>"
+        "</tbody></table>"
     )
     return (
-        '<nav class="toc" aria-label="Table of contents">'
-        '<div class="toc-title">Contents</div>'
-        f"<ol>{items}</ol>"
-        "</nav>"
+        '<div class="wrap"><footer id="refs"><span class="anchor"></span>'
+        '<span class="sec-num">Appendix</span><h3>References &amp; build</h3>'
+        '<p style="font-size:.86rem;max-width:74ch">Every source consulted, resolved to its '
+        "locator — the resolved form of the model's source references, the same data the "
+        "fail-closed gate checks.</p>"
+        f'<div class="reflist">{refitems}</div>'
+        f"{colophon}"
+        '<div class="genline"><span class="gm">●</span> Generated by '
+        f'<a href="{REPO_URL}" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a> — '
+        "a faithful synthesis of many sources into one architecture narrative. Organised by "
+        "architecture, not authoring history. Every claim is traceable to its source.</div>"
+        "</footer></div>"
     )
 
 
-JS = """(function () {
+JS = r"""(function(){
   "use strict";
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var root = document.documentElement;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var nav=document.getElementById('toc'), btn=document.getElementById('navbtn'),
+      links=document.getElementById('toclinks'), curEl=document.getElementById('navcur');
+  var anchors = links ? Array.prototype.slice.call(links.querySelectorAll('a')) : [];
 
-  /* theme (persisted) */
-  var btn = document.getElementById("themeBtn"), lbl = document.getElementById("themeLbl");
-  function setTheme(t){ root.setAttribute("data-theme", t); lbl.textContent = (t === "dark" ? "Light" : "Dark"); try { localStorage.setItem("arch-theme", t); } catch(e){} }
-  try { var sv = localStorage.getItem("arch-theme"); if (sv) setTheme(sv);
-    else if (window.matchMedia("(prefers-color-scheme: dark)").matches) setTheme("dark"); } catch(e){}
-  btn.addEventListener("click", function(){ setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark"); });
+  function setOpen(open){ if(!nav)return; nav.classList.toggle('open',open); if(btn) btn.setAttribute('aria-expanded',open?'true':'false'); }
+  if(btn) btn.addEventListener('click', function(){ setOpen(!nav.classList.contains('open')); });
+  anchors.forEach(function(a){ a.addEventListener('click', function(){ if(curEl) curEl.textContent=a.textContent; setOpen(false); }); });
+  document.addEventListener('click', function(e){ if(nav && nav.classList.contains('open') && !nav.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') setOpen(false); });
 
-  /* reading depth */
-  var depthBtns = Array.prototype.slice.call(document.querySelectorAll(".depth button"));
-  function setDepth(d){ d = String(d); root.setAttribute("data-depth", d);
-    depthBtns.forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-d") === d); });
-    try { localStorage.setItem("arch-depth", d); } catch(e){} }
-  depthBtns.forEach(function(b){ b.addEventListener("click", function(){ setDepth(b.getAttribute("data-d")); }); });
-  try { var sd = localStorage.getItem("arch-depth"); setDepth(sd !== null ? sd : "0"); } catch(e){ setDepth("0"); }
+  /* scrollspy */
+  var targets = anchors.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); }).filter(Boolean);
+  function setActive(a){ if(!a||a.classList.contains('active'))return; anchors.forEach(function(x){x.classList.remove('active');}); a.classList.add('active'); if(curEl) curEl.textContent=a.textContent;
+    if(links && links.scrollWidth>links.clientWidth){ var lr=links.getBoundingClientRect(),ar=a.getBoundingClientRect(); if(ar.left<lr.left||ar.right>lr.right){ links.scrollLeft += (ar.left-lr.left)-(lr.width-ar.width)/2; } } }
+  function recompute(){ var line=100,best=null,bd=Infinity; targets.forEach(function(t){ var top=t.getBoundingClientRect().top,d=line-top; if(d>=0&&d<bd){bd=d;best=t.id;} }); if(!best&&targets[0])best=targets[0].id; var a=anchors.find(function(x){return x.getAttribute('href')==='#'+best;}); setActive(a); }
+  if(targets.length){ var tick=false; window.addEventListener('scroll',function(){ if(!tick){tick=true;requestAnimationFrame(function(){recompute();tick=false;});} },{passive:true}); window.addEventListener('resize',recompute,{passive:true}); recompute(); }
 
-  /* reading-progress bar */
-  var bar = document.getElementById("progress");
-  function onScroll(){ var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
-    bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%"; }
-  document.addEventListener("scroll", onScroll, { passive: true }); onScroll();
+  /* open a targeted disclosure on hash */
+  function openHash(){ if(location.hash){ var t; try{t=document.querySelector(location.hash);}catch(e){return;} if(t&&t.tagName&&t.tagName.toLowerCase()==='details') t.setAttribute('open',''); } }
+  window.addEventListener('hashchange', openHash); openHash();
 
-  /* scrollspy TOC */
-  var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
-  var map = {}; links.forEach(function(a){ map[a.getAttribute("href").slice(1)] = a; });
-  if (window.IntersectionObserver) {
-    var spy = new IntersectionObserver(function(entries){
-      entries.forEach(function(en){ if (en.isIntersecting){
-        links.forEach(function(a){ a.classList.remove("active"); });
-        var a = map[en.target.id]; if (a) a.classList.add("active");
-      }});
-    }, { rootMargin: "-15% 0px -70% 0px" });
-    document.querySelectorAll("main section").forEach(function(s){ spy.observe(s); });
-  }
+  /* e/c expand-collapse all disclosures */
+  document.addEventListener('keydown', function(e){ if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+    if(e.key==='e') document.querySelectorAll('details.mod').forEach(function(d){d.setAttribute('open','');});
+    if(e.key==='c') document.querySelectorAll('details.mod').forEach(function(d){d.removeAttribute('open');}); });
 
-  /* reveal-on-scroll (reduced-motion safe) */
-  if (!reduce && window.IntersectionObserver) {
-    var rev = new IntersectionObserver(function(entries){
-      entries.forEach(function(en){ if (en.isIntersecting){ en.target.classList.add("in"); rev.unobserve(en.target); } });
-    }, { rootMargin: "0px 0px -8% 0px" });
-    document.querySelectorAll(".reveal").forEach(function(el){ rev.observe(el); });
-  } else { document.querySelectorAll(".reveal").forEach(function(el){ el.classList.add("in"); }); }
-
-  /* diagrams: hover-to-explain captions + click-to-jump targets */
-  document.querySelectorAll("figure.fig svg").forEach(function(svg){
-    var cap = svg.parentNode.querySelector("figcaption"); if (!cap) return;
-    var base = cap.innerHTML;
-    svg.querySelectorAll("[data-cap]").forEach(function(n){
-      n.addEventListener("mouseenter", function(){ cap.textContent = n.getAttribute("data-cap"); });
-      n.addEventListener("mouseleave", function(){ cap.innerHTML = base; });
+  /* diagrams: hover-to-explain + click-to-jump */
+  document.querySelectorAll('figure svg').forEach(function(svg){
+    var cap = svg.parentNode.querySelector('figcaption'); var base = cap ? cap.innerHTML : '';
+    svg.querySelectorAll('[data-cap]').forEach(function(n){
+      n.addEventListener('mouseenter', function(){ if(cap) cap.textContent=n.getAttribute('data-cap'); });
+      n.addEventListener('mouseleave', function(){ if(cap) cap.innerHTML=base; });
     });
-    svg.querySelectorAll("[data-target]").forEach(function(n){
-      n.addEventListener("click", function(e){ e.stopPropagation();
-        var t = document.querySelector(n.getAttribute("data-target"));
-        if (t) t.scrollIntoView({ behavior: reduce ? "auto" : "smooth" }); });
+    svg.querySelectorAll('[data-target]').forEach(function(n){
+      n.addEventListener('click', function(e){ e.stopPropagation(); var t; try{t=document.querySelector(n.getAttribute('data-target'));}catch(err){return;} if(t) t.scrollIntoView({behavior:reduce?'auto':'smooth'}); });
     });
   });
+
+  /* figure reveal + timeline scrub + brand motion */
+  var figs = Array.prototype.slice.call(document.querySelectorAll('figure'));
+  if(reduce || !('IntersectionObserver' in window)){
+    figs.forEach(function(f){ f.classList.add('in'); });
+    var nm0=document.querySelector('.brand-mark'); if(nm0) nm0.classList.add('show');
+  } else {
+    var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } }); }, {rootMargin:'0px 0px -10% 0px',threshold:0.15});
+    figs.forEach(function(f){ io.observe(f); });
+    requestAnimationFrame(function(){ figs.forEach(function(f){ if(f.getBoundingClientRect().top<window.innerHeight*0.9) f.classList.add('in'); }); });
+
+    var scrubbed = Array.prototype.slice.call(document.querySelectorAll('.fig-timeline'));
+    scrubbed.forEach(function(f){ f.classList.add('scrubbed'); });
+    function scrub(){ var vh=window.innerHeight; scrubbed.forEach(function(f){ var r=f.getBoundingClientRect(); var p=(vh*0.85 - r.top)/(vh*0.35); p=Math.max(0,Math.min(1,p)); f.style.setProperty('--p',p.toFixed(3)); f.querySelectorAll('[data-at]').forEach(function(el){ el.classList.toggle('lit', p>=parseFloat(el.getAttribute('data-at'))); }); }); }
+    if(scrubbed.length){ var st=false; window.addEventListener('scroll',function(){ if(!st){st=true;requestAnimationFrame(function(){scrub();st=false;});} },{passive:true}); window.addEventListener('resize',scrub,{passive:true}); scrub(); }
+
+    var stars=Array.prototype.slice.call(document.querySelectorAll('.spin-star'));
+    if(stars.length){ var lastY=window.pageYOffset||0,ang=0,sp=false; function spin(){ var y=window.pageYOffset||0; ang+=(y-lastY)*0.18; lastY=y; var v=ang.toFixed(1)+'deg'; stars.forEach(function(s){ s.style.setProperty('--spin',v); }); sp=false; } window.addEventListener('scroll',function(){ if(!sp){sp=true;requestAnimationFrame(spin);} },{passive:true}); }
+
+    var mast=document.querySelector('.brand-logo'), navMark=document.querySelector('.brand-mark');
+    if(mast && navMark){ var io2=new IntersectionObserver(function(es){ es.forEach(function(en){ navMark.classList.toggle('show', !en.isIntersecting); }); }, {threshold:0}); io2.observe(mast); }
+  }
 })();"""
 
 
@@ -808,71 +1062,48 @@ def render(doc: DocumentModel, theme: dict[str, str]) -> str:
     """Pure: DocumentModel + theme tokens → a complete HTML document string."""
     merged = {**DEFAULT_THEME, **theme}
     css = build_css(merged)
-    toc = _render_toc(doc.sections)
+    project = doc.project_name or doc.title
     fig_counter = [0]
-    sections_html = "".join(_render_section(s, fig_counter) for s in doc.sections)
+    sections_html = '<hr class="divider">'.join(_render_section(s, fig_counter) for s in doc.sections)
 
-    lede = (
-        f'<p class="lede">{esc(doc.lede)}</p>' if doc.lede else ""
-    )
-    fonts_link = (
-        '<link rel="preconnect" href="https://fonts.googleapis.com">'
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        '<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700'
-        '&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400'
-        '&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">'
-    )
+    kicker = doc.kicker if doc.kicker else ["Architecture Storybook"]
+    kicker_html = "".join(f"<span>{esc(k)}</span>" for k in kicker[:2])
+    dek = f'<p class="dek">{esc(doc.lede)}</p>' if doc.lede else ""
+    meta_html = ""
+    if doc.meta:
+        meta_html = '<div class="meta-row">' + "".join(
+            f"<span><b>{esc(m.label)}</b> {esc(m.value)}</span>" for m in doc.meta
+        ) + "</div>"
 
-    theme_icon = (
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
-        '<circle cx="12" cy="12" r="4"/>'
-        '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
-        "</svg>"
+    masthead = (
+        '<div class="wrap"><header class="mast">'
+        f'<a href="#" class="brand-logo" aria-label="{esc(project)}">{GLYPH}<span class="brand-word">{esc(project)}</span></a>'
+        f'<div class="kicker">{kicker_html}</div>'
+        f'<h1 class="title">{_title_html(doc.title, doc.title_accent)}</h1>'
+        f"{dek}{meta_html}"
+        "</header></div>"
     )
 
     return (
         "<!DOCTYPE html>\n"
-        '<html lang="en" data-theme="light" data-depth="0">\n'
+        '<html lang="en">\n'
         "<head>\n"
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        '<meta name="color-scheme" content="light only">\n'
+        '<meta name="theme-color" content="#f4f0e6">\n'
         f"<title>{esc(doc.title)}</title>\n"
-        f"{fonts_link}\n"
-        f"<style>\n{css}\n</style>\n"
+        f"<style>{css}</style>\n"
         "</head>\n"
         "<body>\n"
-        '<div id="progress" aria-hidden="true"></div>\n'
-        '<div class="controls">\n'
-        '  <div class="seg depth" role="group" aria-label="Reading depth">\n'
-        '    <button data-d="0" aria-pressed="true">Overview</button>\n'
-        '    <button data-d="1" aria-pressed="false">Technical</button>\n'
-        '    <button data-d="2" aria-pressed="false">Sources</button>\n'
-        "  </div>\n"
-        '  <button class="toggle" id="themeBtn" aria-label="Toggle colour theme">\n'
-        f"    {theme_icon}\n"
-        '    <span id="themeLbl">Dark</span>\n'
-        "  </button>\n"
-        "</div>\n"
-        '<header class="mast"><div class="wrap">\n'
-        '  <div class="kicker">System Architecture</div>\n'
-        f"  <h1>{esc(doc.title)}</h1>\n"
-        f"  {lede}\n"
-        '  <p class="depthnote">Read at three depths with the control above. '
-        "<b>Overview</b> is the plain-English story. <b>Technical</b> reveals the engineering detail. "
-        "<b>Sources</b> shows the cited specs and code behind each claim.</p>\n"
-        "</div></header>\n"
-        '<div class="wrap layout">\n'
-        f"{toc}\n"
-        "<main>\n"
+        '<div class="grain"></div>\n'
+        f"{masthead}\n"
+        f"{_render_nav(doc.sections, project)}\n"
+        '<div class="wrap">\n'
         f"{sections_html}\n"
-        "</main>\n"
         "</div>\n"
-        "<footer><div class=\"wrap\">Synthesized whole-system architecture — "
-        "organized by structure, not by authoring history. Reads at three depths: "
-        "plain-English overview, technical drill-down, and cited sources. Where the "
-        "underlying specifications leave a question open, this document says so rather "
-        "than guessing.</div></footer>\n"
-        f"<script>\n{JS}\n</script>\n"
+        f"{_render_footer(doc, project)}\n"
+        f"<script>{JS}</script>\n"
         "</body>\n"
         "</html>\n"
     )

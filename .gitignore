@@ -8,4 +8,5 @@ __pycache__/
 .pytest_cache/
 
 # per-run build artifacts (stateless; regenerated each run — DESIGN §11.2 #4)
-.synthesis/
+# .synthesis/ is the default work dir; .synthesis-<name>/ are scratch dogfood dirs
+.synthesis*/

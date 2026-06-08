@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#f4f0e6">
+<title>Spec-Kit → Linear Bridge</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Spline+Sans+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
+:root{
+  --ink: #16140f;
+  --paper: #f4f0e6;
+  --paper-2: #ebe5d6;
+  --gold: #a8742a;
+  --gold-bright: #cf9a3c;
+  --red: #9b3022;
+  --green: #3f5d3a;
+  --blue: #2c4a63;
+  --line: #cdc4ad;
+  --line-dk: #b3a98d;
+  --shadow: rgba(40,32,16,.16);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Newsreader', Georgia, serif;
+  --font-mono: 'Spline Sans Mono', ui-monospace, Menlo, monospace;
+  --ease: cubic-bezier(.22,.61,.36,1);
+}
+
+  :root{ color-scheme: light; }
+  html{ color-scheme: light; background-color: var(--paper) !important; scroll-behavior: smooth; }
+  body{ background-color: var(--paper) !important; min-height: 100vh; }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior: auto; } }
+
+  *{ box-sizing: border-box; margin: 0; padding: 0; }
+  body{
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 18px; line-height: 1.62;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(168,116,42,.05), transparent 40%),
+      radial-gradient(circle at 88% 92%, rgba(44,74,99,.05), transparent 42%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .grain{ position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"); }
+
+  .wrap{ max-width: 1180px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 2; }
+
+  /* brand */
+  .spin-star{ transform-box: fill-box; transform-origin: center; transform: rotate(var(--spin,0deg)); transition: transform .35s var(--ease); will-change: transform; }
+  .brand-logo{ display: inline-flex; align-items: center; gap: 11px; margin-bottom: 22px; text-decoration: none; color: var(--ink); }
+  .glyph{ display: block; height: 32px; width: 32px; }
+  .brand-word{ font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: -.01em; }
+  nav.toc .brand-mark{ display: flex; align-items: center; gap: 8px; flex: 0 0 auto; text-decoration: none; color: var(--ink);
+    opacity: 0; max-width: 0; overflow: hidden; padding-right: 0; margin-right: 0; border-right: 1px solid transparent;
+    transition: opacity .3s ease, max-width .35s ease, padding-right .35s ease, margin-right .35s ease; }
+  nav.toc .brand-mark.show{ opacity: 1; max-width: 260px; padding-right: 16px; margin-right: 8px; border-right-color: var(--line-dk); }
+  nav.toc .brand-mark .glyph{ height: 20px; width: 20px; }
+  nav.toc .brand-mark .brand-word{ font-size: 16px; }
+
+  /* masthead */
+  header.mast{ border-bottom: 3px double var(--ink); padding: 40px 0 22px; margin-bottom: 8px; }
+  .kicker{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .32em; text-transform: uppercase; color: var(--gold);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 18px; }
+  h1.title{ font-family: var(--font-display); font-weight: 900; font-size: clamp(2.4rem,6vw,4.6rem); line-height: .96; letter-spacing: -.02em; }
+  h1.title em{ font-style: italic; font-weight: 500; color: var(--gold); }
+  .dek{ font-size: clamp(1.05rem,2vw,1.32rem); max-width: 720px; margin-top: 18px; color: #42392a; line-height: 1.5; }
+  .meta-row{ display: flex; gap: 26px; flex-wrap: wrap; margin-top: 22px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5b513c; }
+  .meta-row b{ color: var(--ink); font-weight: 600; }
+
+  /* sticky nav */
+  nav.toc{ position: sticky; top: 0; z-index: 50; background: rgba(244,240,230,.96);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line-dk); box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 6px 18px -12px var(--shadow);
+    padding: 10px 0; margin-bottom: 46px; }
+  nav.toc .wrap{ display: flex; gap: 5px; align-items: center; }
+  nav.toc .links{ display: flex; gap: 4px; align-items: center; flex: 1; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  nav.toc .links::-webkit-scrollbar{ display: none; }
+  nav.toc a{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: #5b513c; text-decoration: none;
+    padding: 6px 10px; border: 1px solid transparent; border-radius: 3px; transition: all .18s; white-space: nowrap; flex: 0 0 auto; }
+  nav.toc a:hover, nav.toc a:focus-visible{ color: var(--ink); border-color: var(--line-dk); background: var(--paper-2); outline: none; }
+  nav.toc a.active{ color: var(--gold); border-color: var(--gold); background: rgba(168,116,42,.08); font-weight: 600; }
+  nav.toc .navbtn{ display: none; align-items: center; gap: 9px; width: 100%; background: none; border: none; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); padding: 4px 2px; }
+  nav.toc .navbtn .lbl{ flex: 1; text-align: left; color: #5b513c; }
+  nav.toc .navbtn .cur{ color: var(--ink); font-weight: 600; }
+  nav.toc .navbtn .bars{ display: inline-flex; flex-direction: column; gap: 3px; width: 20px; }
+  nav.toc .navbtn .bars span{ height: 2px; background: var(--ink); border-radius: 2px; transition: transform .25s, opacity .2s; }
+  nav.toc.open .navbtn .bars span:nth-child(1){ transform: translateY(5px) rotate(45deg); }
+  nav.toc.open .navbtn .bars span:nth-child(2){ opacity: 0; }
+  nav.toc.open .navbtn .bars span:nth-child(3){ transform: translateY(-5px) rotate(-45deg); }
+
+  /* sections + type */
+  section{ margin-bottom: 64px; scroll-margin-top: 64px; }
+  .sec-num{ font-family: var(--font-mono); font-size: 12px; letter-spacing: .2em; color: var(--gold); text-transform: uppercase; }
+  h2{ font-family: var(--font-display); font-weight: 900; font-size: clamp(1.9rem,4vw,3rem); line-height: 1.04; letter-spacing: -.015em; margin: 6px 0 8px; }
+  h3{ font-family: var(--font-display); font-weight: 600; font-size: 1.45rem; margin: 34px 0 12px; letter-spacing: -.01em; }
+  h4{ font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin: 24px 0 8px; }
+  p{ margin-bottom: 16px; max-width: 74ch; }
+  p.lead{ font-size: 1.22rem; line-height: 1.5; color: #2e2a20; }
+  p.pull{ border-left: 3px solid var(--gold); padding: 6px 0 6px 22px; margin: 30px 0; font-family: var(--font-display); font-style: italic; font-size: 1.5rem; line-height: 1.32; color: #2e2a20; max-width: none; }
+  a{ color: var(--blue); text-underline-offset: 3px; }
+  strong{ font-weight: 600; color: var(--ink); }
+  em.term{ font-style: italic; color: var(--gold); font-weight: 500; }
+  .mono{ font-family: var(--font-mono); font-size: .82em; }
+  .divider{ border: none; border-top: 1px solid var(--line); margin: 48px 0; }
+
+  /* callouts */
+  .note{ background: var(--paper-2); border: 1px solid var(--line-dk); border-radius: 4px; padding: 18px 22px; margin: 24px 0; font-size: .96rem; line-height: 1.55; max-width: 74ch; }
+  .note .tag{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); display: block; margin-bottom: 6px; }
+  .note.flag{ border-left: 3px solid var(--red); }
+  .note.flag .tag{ color: var(--red); }
+  .note.flag-ok{ border-left: 3px solid var(--green); }
+  .note.flag-ok .tag{ color: var(--green); }
+
+  /* tables */
+  .tbl-scroll{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.tbl{ width: 100%; border-collapse: collapse; margin: 20px 0; font-size: .93rem; }
+  table.tbl th{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--ink); color: #42392a; vertical-align: bottom; }
+  table.tbl td{ padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.42; }
+  table.tbl tr:hover td{ background: rgba(168,116,42,.05); }
+  .cov-note{ font-size: 12.5px; color: #7d705a; margin-top: 3px; }
+  td.covsrc{ display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill{ display: inline-block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+  .pill.build{ background: #d8e4d2; color: #2f4628; }
+  .pill.buy{ background: #f0dccb; color: #7a4316; }
+  .pill.hybrid{ background: #d9e2ea; color: #274056; }
+  .pill.hard{ background: #efd0c9; color: #7c2618; }
+
+  /* per-section disclosure */
+  .mod{ border: 1px solid var(--line-dk); border-radius: 5px; margin: 24px 0 12px; overflow: hidden; background: rgba(255,253,247,.5); transition: box-shadow .2s; }
+  .mod[open]{ box-shadow: 0 8px 30px var(--shadow); }
+  .mod summary{ cursor: pointer; list-style: none; padding: 18px 22px; display: flex; align-items: center; gap: 18px; transition: background .18s; }
+  .mod summary::-webkit-details-marker{ display: none; }
+  .mod summary:hover{ background: var(--paper-2); }
+  .mod .mt{ font-family: var(--font-display); font-weight: 600; font-size: 1.16rem; flex: 1; letter-spacing: -.01em; }
+  .mod .mx{ font-family: var(--font-mono); font-size: 20px; color: var(--gold); transition: transform .25s; }
+  .mod[open] .mx{ transform: rotate(45deg); }
+  .mod .body{ padding: 4px 24px 24px; border-top: 1px solid var(--line); }
+  .mod .body p{ font-size: .97rem; }
+  .what{ font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #7d705a; margin: 16px 0 4px; }
+
+  /* per-section sources line + inline citation chips */
+  .srcline{ margin: 18px 0 4px; font-family: var(--font-mono); font-size: 11px; color: #7d705a; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: baseline; }
+  .srcline .srclab{ letter-spacing: .16em; text-transform: uppercase; color: #9a8e74; }
+  .srcline a.ref{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); }
+  .srcline a.ref:hover{ border-bottom-color: var(--blue); }
+  .cite-t{ display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; color: #fff; margin-right: 5px; }
+  .cite-t.spec{ background: var(--gold); }
+  .cite-t.code{ background: var(--green); }
+  .cite-t.doc{ background: var(--blue); }
+
+  /* diagram frames */
+  figure{ margin: 34px 0; border: 1px solid var(--line-dk); border-radius: 6px; background: #fbf9f2; padding: 8px; box-shadow: 0 4px 20px var(--shadow); overflow: hidden; }
+  figure svg{ display: block; width: 100%; height: auto; }
+  figcaption{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: #6b5f48; padding: 10px 14px 6px; border-top: 1px solid var(--line); margin-top: 8px; text-transform: uppercase; }
+  figcaption b{ color: var(--ink); }
+
+  /* SVG diagram primitives — ALL visual styling (fill / stroke / font / weight) is emitted
+     INLINE (literal values) on each element, so diagrams render correctly even where the
+     document <style> is not cascaded into inline SVG (QuickLook, mail/preview panes, some PDF
+     paths). CSS here carries only the pointer affordance; motion rules live further below. */
+  .d-node.act{ cursor: pointer; }
+
+  /* ===== per-layout diagram MOTION (fitted to each layout's grammar) ===== */
+  figure{ opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s var(--ease); }
+  figure.in{ opacity: 1; transform: none; }
+
+  @keyframes partIn{ from{ opacity: 0; } to{ opacity: 1; } }
+  @keyframes popIn{ 0%{ opacity: 0; transform: scale(.4);} 60%{ transform: scale(1.12);} 100%{ opacity: 1; transform: scale(1);} }
+  @keyframes drawIn{ to{ stroke-dashoffset: 0; } }
+  @keyframes sweep{ from{ transform: rotate(-90deg); opacity: 0;} 40%{ opacity: 1;} to{ transform: rotate(0); opacity: 1;} }
+  @keyframes layerIn{ from{ opacity: 0; transform: translateY(14px);} to{ opacity: 1; transform: none;} }
+  @keyframes riseIn{ from{ opacity: 0; transform: translateY(10px);} to{ opacity: 1; transform: none;} }
+  @keyframes traceMove{ 0%{ stroke-dashoffset: 1600; opacity: 0;} 8%{ opacity: .9;} 90%{ opacity: .9;} 100%{ stroke-dashoffset: -40; opacity: 0;} }
+
+  /* staggered delays (shared) */
+  .a0{ animation-delay: .06s; } .a1{ animation-delay: .14s; } .a2{ animation-delay: .22s; }
+  .a3{ animation-delay: .30s; } .a4{ animation-delay: .38s; } .a5{ animation-delay: .46s; }
+  .a6{ animation-delay: .54s; } .a7{ animation-delay: .62s; } .a8{ animation-delay: .70s; }
+  .a9{ animation-delay: .78s; } .a10{ animation-delay: .86s; } .a11{ animation-delay: .94s; }
+
+  /* pipeline — stages illuminate L→R */
+  .fig-pipeline.in svg .anim{ animation: popIn .5s var(--ease) both; transform-box: fill-box; transform-origin: center; }
+  /* flow — nodes drop in top→bottom; a comet traces the spine (flow is continuous) */
+  .fig-flow.in svg .anim{ animation: riseIn .5s var(--ease) both; }
+  .flow-trace{ fill: none; stroke: var(--gold-bright); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 26 1600; stroke-dashoffset: 1600; opacity: 0; }
+  .fig-flow.in .flow-trace{ animation: traceMove 3s cubic-bezier(.4,0,.2,1) .8s infinite; }
+  /* ladder — rungs draw in order */
+  .fig-ladder.in svg .anim{ animation: riseIn .5s var(--ease) both; }
+  /* mapping — left column, then links draw, then right column */
+  .fig-mapping.in svg .lm-l, .fig-mapping.in svg .lm-r{ animation: partIn .45s ease both; }
+  .fig-mapping.in svg .lm-r{ animation-delay: .7s; }
+  .fig-mapping.in svg .lm-k{ stroke-dasharray: 760; stroke-dashoffset: 760; animation: drawIn .5s ease .45s both; }
+  /* panel — cards stagger-fade */
+  .fig-panel.in svg .anim{ animation: partIn .45s ease both; }
+  /* hub — core pops, spokes draw outward, nodes fade, ring sweeps */
+  .fig-hub.in svg .hub-core{ animation: popIn .5s var(--ease) .05s both; transform-box: fill-box; transform-origin: center; }
+  .fig-hub.in svg .hub-spoke{ stroke-dasharray: 240; stroke-dashoffset: 240; animation: drawIn .5s ease .32s both; }
+  .fig-hub.in svg .hub-node{ animation: partIn .45s ease .55s both; }
+  .fig-hub.in svg .hub-ring{ transform-box: fill-box; transform-origin: center; animation: sweep .7s var(--ease) .85s both; }
+  /* stack — layers build bottom-up (bottom layer carries .a0) */
+  .fig-stack.in svg .stack-layer{ animation: layerIn .55s var(--ease) both; }
+  /* timeline — line draws L→R, nodes light in order (scroll-scrubbed via --p) */
+  .fig-timeline svg .tl-line{ stroke-dasharray: 900; stroke-dashoffset: calc(900 - 900 * var(--p,0)); }
+  .fig-timeline svg .tl-node{ opacity: 0; transform: scale(.4); transform-box: fill-box; transform-origin: center; transition: opacity .25s, transform .25s; }
+  .fig-timeline svg .tl-node.lit{ opacity: 1; transform: scale(1); }
+  .fig-timeline.in:not(.scrubbed) svg .tl-line{ stroke-dashoffset: 0; transition: stroke-dashoffset 1s ease; }
+  .fig-timeline.in:not(.scrubbed) svg .tl-node{ opacity: 1; transform: scale(1); }
+
+  /* footer */
+  footer{ border-top: 3px double var(--ink); margin-top: 30px; padding: 30px 0 70px; font-size: .86rem; color: #5b513c; }
+  footer h3{ margin-top: 6px; }
+  footer .reflist{ columns: 2; column-gap: 40px; font-size: .8rem; line-height: 1.55; margin-top: 16px; }
+  footer .reflist p{ margin-bottom: 8px; max-width: none; break-inside: avoid; }
+  .reftype{ font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #fff; padding: 1px 5px; border-radius: 4px; margin-right: 6px; }
+  .reftype.spec{ background: var(--gold); } .reftype.code{ background: var(--green); } .reftype.doc{ background: var(--blue); }
+  .colophon{ width: 100%; border-collapse: collapse; margin-top: 22px; font-family: var(--font-mono); font-size: 11px; background: var(--paper-2); border: 1px solid var(--line-dk); border-radius: 5px; overflow: hidden; }
+  .colophon th, .colophon td{ text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
+  .colophon tbody tr:last-child th, .colophon tbody tr:last-child td{ border-bottom: none; }
+  .colophon tbody th{ width: 120px; white-space: nowrap; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); font-weight: 600; background: rgba(168,116,42,.06); border-right: 1px solid var(--line); }
+  .colophon td{ color: #3a3324; }
+  .vtag{ display: inline-block; background: var(--ink); color: var(--paper); padding: 2px 9px; border-radius: 10px; font-size: 10px; letter-spacing: .06em; font-weight: 600; }
+  .genline{ margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 10px; line-height: 1.7; letter-spacing: .04em; color: #7d705a; max-width: none; text-transform: uppercase; }
+  .genline .gm{ color: var(--green); margin-right: 6px; }
+  .genline a{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.4); }
+  .genline a:hover{ border-bottom-color: var(--blue); }
+
+  ul.clean{ list-style: none; margin: 12px 0; }
+  ul.clean li{ padding: 5px 0 5px 22px; position: relative; font-size: .97rem; line-height: 1.45; }
+  ul.clean li::before{ content: "\2192"; position: absolute; left: 0; color: var(--gold); font-family: var(--font-mono); }
+
+  ol.steps{ margin: 14px 0 14px 4px; counter-reset: s; list-style: none; }
+  ol.steps li{ counter-increment: s; padding: 8px 0 8px 40px; position: relative; border-bottom: 1px dotted var(--line); font-size: .96rem; }
+  ol.steps li::before{ content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--gold); font-weight: 600; }
+
+  .anchor{ display: block; position: relative; top: -64px; visibility: hidden; }
+
+  /* responsive */
+  @media (max-width: 900px){ body{ font-size: 17px; } .wrap{ padding: 0 22px; } }
+  @media (max-width: 680px){
+    body{ font-size: 16px; line-height: 1.58; }
+    .wrap{ padding: 0 18px; }
+    header.mast{ padding: 28px 0 18px; }
+    .kicker{ font-size: 9.5px; letter-spacing: .2em; }
+    .dek{ font-size: 1.06rem; }
+    .meta-row{ gap: 14px 20px; font-size: 10px; }
+    section{ margin-bottom: 48px; scroll-margin-top: 60px; }
+    h2{ font-size: 1.7rem; } h3{ font-size: 1.25rem; }
+    p, p.lead{ max-width: none; } p.lead{ font-size: 1.1rem; }
+    p.pull{ font-size: 1.22rem; padding-left: 16px; }
+    .note{ padding: 15px 16px; }
+    .mod summary{ padding: 14px 16px; gap: 12px; }
+    .mod .mt{ font-size: 1.02rem; }
+    .mod .body{ padding: 4px 16px 18px; }
+    nav.toc{ padding: 0; margin-bottom: 34px; }
+    nav.toc .navbtn{ display: flex; padding: 13px 0; flex: 1; }
+    nav.toc .links{ position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 0;
+      background: var(--paper); border-bottom: 1px solid var(--line-dk); box-shadow: 0 14px 24px -10px var(--shadow);
+      max-height: 0; overflow: hidden; transition: max-height .32s ease; padding: 0 18px; }
+    nav.toc.open .links{ max-height: 80vh; overflow-y: auto; padding: 6px 18px 12px; }
+    nav.toc .links a{ font-size: 12px; padding: 11px 6px; border: none; border-bottom: 1px solid var(--line); border-radius: 0; white-space: normal; }
+    nav.toc .links a:last-child{ border-bottom: none; }
+    table.tbl{ min-width: 520px; }
+    .colophon{ font-size: 10px; }
+    footer .reflist{ columns: 1; }
+  }
+  @media (max-width: 400px){ h1.title{ font-size: 2.1rem; } nav.toc .navbtn .lbl{ font-size: 10px; } }
+
+  /* reduced-motion + print + no-JS: settle every diagram to its final static state */
+  @media (prefers-reduced-motion: reduce){
+    *{ animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    figure{ opacity: 1 !important; transform: none !important; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+    .flow-trace{ display: none !important; }
+    .spin-star{ transform: none !important; }
+  }
+  @media print{
+    figure{ opacity: 1 !important; transform: none !important; break-inside: avoid; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+    .flow-trace{ display: none !important; }
+  }
+  @media (scripting: none){
+    figure{ opacity: 1 !important; transform: none !important; }
+    figure svg *{ opacity: 1 !important; transform: none !important; }
+    .tl-line, .hub-spoke, .lm-k{ stroke-dashoffset: 0 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="wrap"><header class="mast"><a href="#" class="brand-logo" aria-label="speckit-linear"><svg class="glyph" viewBox="0 0 40 40" role="img" aria-label="mark" xmlns="http://www.w3.org/2000/svg"><g class="spin-star"><g transform="translate(20,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round"><line x1="-13" y1="0" x2="13" y2="0"/><line x1="0" y1="-13" x2="0" y2="13"/><line x1="-9.2" y1="-9.2" x2="9.2" y2="9.2"/><line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/></g></g></svg><span class="brand-word">speckit-linear</span></a><div class="kicker"><span>Architecture Storybook</span><span>Synthesised from spec · code</span></div><h1 class="title">Spec-Kit → <em>Linear Bridge</em></h1><p class="dek">Your repository&#x27;s spec-kit feature folders, mirrored into Linear as living, trackable issues — automatically, one way, and never by hand.</p><div class="meta-row"><span><b>Project</b> speckit-linear</span><span><b>Sources</b> spec · code</span><span><b>Build</b> deterministic</span></div></header></div>
+<nav class="toc" id="toc"><div class="wrap"><a href="#" class="brand-mark" aria-label="speckit-linear"><svg class="glyph" viewBox="0 0 40 40" role="img" aria-label="mark" xmlns="http://www.w3.org/2000/svg"><g class="spin-star"><g transform="translate(20,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round"><line x1="-13" y1="0" x2="13" y2="0"/><line x1="0" y1="-13" x2="0" y2="13"/><line x1="-9.2" y1="-9.2" x2="9.2" y2="9.2"/><line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/></g></g></svg><span class="brand-word">speckit-linear</span></a><button class="navbtn" id="navbtn" aria-expanded="false" aria-controls="toclinks"><span class="bars"><span></span><span></span><span></span></span><span class="lbl">Contents · <span class="cur" id="navcur">What this system is</span></span></button><div class="links" id="toclinks"><a href="#what">What this system is</a><a href="#bigpicture">Architecture at a glance</a><a href="#datamodel">The data model</a><a href="#authority">Authority &amp; safety model</a><a href="#engine">The synthesis engine</a></div></div></nav>
+<div class="wrap">
+<section id="what"><span class="anchor"></span><span class="sec-num">01 — The picture in one read</span><h2>What this system is</h2><p class="lead">The one-paragraph version, then the why.</p><p>This system is a spec-kit extension: install it into a repository, and every feature folder is reflected into Linear — one Project per repository, one Issue per feature, one sub-issue per implementation phase — and it keeps that reflection current automatically as you work.</p><div class="note flag-ok"><span class="tag">Core idea</span>The filesystem is the single source of truth for planned work; Linear is a faithful projection of it. The bridge converges that projection to the files on every run — idempotently and without silently destroying information.</div><div class="srcline"><span class="srclab">Sources</span><a class="ref" href="#refs" title="001 · spec.md · Overview · Overview, FR-001"><span class="cite-t spec">spec</span>001 · spec.md · Overview</a><a class="ref" href="#refs" title="constitution · Principles I–II · Filesystem is the single source of truth"><span class="cite-t spec">spec</span>constitution · Principles I–II</a><a class="ref" href="#refs" title="001 · spec.md · Overview"><span class="cite-t spec">spec</span>001 · spec.md · Overview</a></div></section><hr class="divider"><section id="bigpicture"><span class="anchor"></span><span class="sec-num">02</span><h2>Architecture at a glance</h2><p class="lead">A reconcile engine over the filesystem, writing into Linear.</p><p>The reconciler reads the repository, computes what Linear should contain, and makes it so. It is what every local trigger runs.</p><figure class="fig fig-pipeline"><svg id="fig1" viewBox="0 0 1000 254" role="img" aria-label="How a run reconciles the repository"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">How a run reconciles the repository</text><g transform="translate(0,50)"><defs><marker id="fig1-af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#a8742a"/></marker><marker id="fig1-am" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#b3a98d"/></marker></defs><g class="d-node act anim a0" data-cap="The repository is the single source of truth: feature folders plus the committed binding config." data-target="#datamodel"><rect x="40" y="70" width="161.6" height="64" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="120.8" y="106" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#3a3324" text-anchor="middle">repository</text></g><g class="d-node act anim a1" data-cap="Layer D reads every feature folder from disk."><rect x="229.6" y="70" width="161.6" height="64" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="310.4" y="106" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#3a3324" text-anchor="middle">read</text></g><g class="d-node act anim a2" data-cap="Infer each feature&#x27;s lifecycle phase from what exists on disk."><rect x="419.2" y="70" width="161.6" height="64" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="106" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#3a3324" text-anchor="middle">infer</text></g><g class="d-node act anim a3" data-cap="Write the desired state into Linear, idempotently." data-target="#datamodel"><rect x="608.8" y="70" width="161.6" height="64" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="689.6" y="106" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#3a3324" text-anchor="middle">write</text></g><g class="d-node act anim a4" data-cap="One Project per repo, one Issue per feature, sub-issues per phase."><rect x="798.4" y="70" width="161.6" height="64" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="879.2" y="106" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#3a3324" text-anchor="middle">Linear</text></g><path d="M201.6 102 C 215.6 102, 215.6 102, 229.6 102" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig1-am)"/><text x="215.6" y="94" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="10.5" fill="#3a3324" text-anchor="middle">trigger</text><path d="M391.2 102 C 405.2 102, 405.2 102, 419.2 102" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig1-am)"/><path d="M580.8 102 C 594.8 102, 594.8 102, 608.8 102" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig1-am)"/><path d="M770.4 102 C 784.4 102, 784.4 102, 798.4 102" fill="none" stroke="#a8742a" stroke-width="2" marker-end="url(#fig1-af)"/><text x="784.4" y="94" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="10.5" fill="#a8742a" text-anchor="middle">create / update</text></g></svg><figcaption id="cap-fig1"><b>Fig. 1</b> — hover a node to explain · click to jump.</figcaption></figure><details class="mod" id="bigpicture-tech"><summary><span class="mt">Technical detail</span><span class="mx">+</span></summary><div class="body"><p>State lives in exactly three inspectable places: the repository&#x27;s filesystem, Linear itself, and the GitHub Action&#x27;s per-run environment. There is no database, no daemon, and no local &quot;last-seen&quot; cache — the reconciler recomputes everything from the filesystem each run.</p></div></details><div class="srcline"><span class="srclab">Sources</span><a class="ref" href="#refs" title="001 · plan.md · two layers"><span class="cite-t spec">spec</span>001 · plan.md · two layers</a><a class="ref" href="#refs" title="src/reconcile.sh · the single reconcile entry point"><span class="cite-t code">code</span>src/reconcile.sh</a><a class="ref" href="#refs" title="001 · spec.md"><span class="cite-t spec">spec</span>001 · spec.md</a><a class="ref" href="#refs" title="src/reconcile.sh"><span class="cite-t code">code</span>src/reconcile.sh</a><a class="ref" href="#refs" title="001 · research.md · §15 state · Decision 15"><span class="cite-t spec">spec</span>001 · research.md · §15 state</a></div></section><hr class="divider"><section id="datamodel"><span class="anchor"></span><span class="sec-num">03</span><h2>The data model</h2><p class="lead">How a feature folder maps onto Linear, and the lifecycle ladder it climbs.</p><p>A repository becomes a Project; each feature spec becomes an Issue inside it; each implementation phase becomes a sub-issue; the tasks within a phase become a read-only checklist.</p><figure class="fig fig-ladder"><svg id="fig2" viewBox="0 0 1000 256" role="img" aria-label="The lifecycle ladder"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">The lifecycle ladder</text><g transform="translate(0,50)"><defs><marker id="fig2-af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#a8742a"/></marker><marker id="fig2-am" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#b3a98d"/></marker></defs><line x1="40" y1="180" x2="970" y2="180" stroke="#cdc4ad"/><g class="d-node act anim a0" data-cap="Rank 0 — spec.md exists, no plan yet."><rect x="40" y="128" width="96" height="38" rx="8" fill="#fbf9f2" stroke="#b3a98d"/><text x="49" y="143" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9" fill="#7d705a" letter-spacing=".12em">0</text><text x="49" y="158" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9.5" fill="#3a3324">Specifying</text></g><path d="M136 147 H 248.5" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig2-am)"/><g class="d-node act anim a1" data-cap="Rank 1 — plan.md appears."><rect x="248.5" y="106" width="96" height="38" rx="8" fill="#fbf9f2" stroke="#b3a98d"/><text x="257.5" y="121" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9" fill="#7d705a" letter-spacing=".12em">1</text><text x="257.5" y="136" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9.5" fill="#3a3324">Planning</text></g><path d="M344.5 125 H 457" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig2-am)"/><g class="d-node act anim a2" data-cap="Rank 2 — tasks.md appears."><rect x="457" y="84" width="96" height="38" rx="8" fill="#fbf9f2" stroke="#b3a98d"/><text x="466" y="99" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9" fill="#7d705a" letter-spacing=".12em">2</text><text x="466" y="114" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9.5" fill="#3a3324">Tasking</text></g><path d="M553 103 H 665.5" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig2-am)"/><g class="d-node act anim a3" data-cap="Rank 3 — implementation evidence on the branch."><rect x="665.5" y="62" width="96" height="38" rx="8" fill="#fbf9f2" stroke="#b3a98d"/><text x="674.5" y="77" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9" fill="#7d705a" letter-spacing=".12em">3</text><text x="674.5" y="92" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9.5" fill="#3a3324">Implementing</text></g><path d="M761.5 81 H 874" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig2-am)"/><g class="d-node act anim a4" data-cap="Rank 4 — the PR has merged; no phase label." data-target="#what"><rect x="874" y="40" width="96" height="38" rx="8" fill="#fbf9f2" stroke="#a8742a"/><text x="883" y="55" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9" fill="#7d705a" letter-spacing=".12em">4</text><text x="883" y="70" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="9.5" fill="#a8742a">Merged</text></g></g></svg><figcaption id="cap-fig2"><b>Fig. 2</b> — hover a node to explain · click to jump.</figcaption></figure><details class="mod" id="datamodel-tech"><summary><span class="mt">Technical detail</span><span class="mx">+</span></summary><div class="body"><div class="tbl-scroll"><table class="tbl"><thead><tr><th>Rank</th><th>Phase</th><th>Advanced when…</th></tr></thead><tbody><tr><td>0</td><td>Specifying</td><td>spec.md exists, no plan.md yet</td></tr><tr><td>1</td><td>Planning</td><td>plan.md appears</td></tr><tr><td>2</td><td>Tasking</td><td>tasks.md appears</td></tr><tr><td>3</td><td>Implementing</td><td>implementation evidence on the branch</td></tr><tr><td>4</td><td>Merged</td><td>the PR has merged (no phase label)</td></tr></tbody></table></div></div></details><div class="srcline"><span class="srclab">Sources</span><a class="ref" href="#refs" title="001 · spec.md · mapping table"><span class="cite-t spec">spec</span>001 · spec.md · mapping table</a><a class="ref" href="#refs" title="001 · data-model.md · 9-phase lifecycle · §6.1 lifecycle state machine"><span class="cite-t spec">spec</span>001 · data-model.md · 9-phase lifecycle</a><a class="ref" href="#refs" title="001 · contracts/config-schema.json · UUID-keyed workflow states"><span class="cite-t spec">spec</span>001 · contracts/config-schema.json</a></div></section><hr class="divider"><section id="authority"><span class="anchor"></span><span class="sec-num">04</span><h2>Authority &amp; safety model</h2><p class="lead">Who wins when the repository and Linear disagree.</p><p>The governing principle is that the filesystem is the authority. When the repository and a Linear issue disagree, the repository wins — but the bridge will not regress Linear blindly.</p><figure class="fig fig-flow"><svg id="fig3" viewBox="0 0 1000 476" role="img" aria-label="The write-authority decision"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">The write-authority decision</text><g transform="translate(0,50)"><defs><marker id="fig3-af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#a8742a"/></marker><marker id="fig3-am" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#b3a98d"/></marker></defs><g class="d-node act anim a0" data-cap="Every write path begins here."><rect x="360" y="24" width="280" height="56" rx="26" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="56" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="13" fill="#16140f" text-anchor="middle">before writing a feature</text></g><g class="d-node act anim a1" data-cap="The drift check decides whether Linear ranks higher than disk."><rect x="360" y="126" width="280" height="56" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="158" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="13" fill="#16140f" text-anchor="middle">is Linear ahead of the repo?</text></g><g class="d-node act anim a2" data-cap="No drift — forward / equal movement writes idempotently."><rect x="360" y="228" width="280" height="56" rx="12" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="260" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="13" fill="#16140f" text-anchor="middle">write silently</text></g><g class="d-node act anim a3" data-cap="Backward-drift — surface it; let the operator decide."><rect x="360" y="330" width="280" height="56" rx="26" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="362" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="13" fill="#16140f" text-anchor="middle">surface a structured warning</text></g><path d="M500 80 V 126" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig3-am)"/><path d="M500 182 V 228" fill="none" stroke="#b3a98d" stroke-width="1.6" marker-end="url(#fig3-am)"/><text x="510" y="209" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="10.5" fill="#3a3324">no · forward</text><path d="M500 182 V 330" fill="none" stroke="#a8742a" stroke-width="2" marker-end="url(#fig3-af)"/><text x="510" y="260" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="10.5" fill="#a8742a">yes · drift</text><path class="flow-trace" d="M500 80 V 330" fill="none"/></g></svg><figcaption id="cap-fig3"><b>Fig. 3</b> — hover a node to explain · click to jump.</figcaption></figure><div class="note"><span class="tag">Evolution — write authority was redefined</span>The original rule was a hard gate tied to git branches: only a worktree on a feature&#x27;s own branch could write it. It was superseded by the drift-aware model: any worktree may write, and the bridge detects and surfaces a backward move rather than forbidding it.</div><div class="note flag"><span class="tag">Unspecified — orphaned phase sub-issues</span>If an entire implementation phase is removed from tasks.md, what becomes of the sub-issue it created is not specified at all — neither cleanup nor retention is defined.</div><details class="mod" id="authority-tech"><summary><span class="mt">Technical detail</span><span class="mx">+</span></summary><div class="body"><p>Backward-drift fires when Linear&#x27;s recorded phase rank strictly exceeds the disk-inferred rank — clock-independent. A corroborating recency signal uses the feature folder&#x27;s last git-commit time, never file mtime, with a small clock-skew tolerance.</p></div></details><div class="srcline"><span class="srclab">Sources</span><a class="ref" href="#refs" title="003 · spec.md · FR-051–057 · drift-aware write authority"><span class="cite-t spec">spec</span>003 · spec.md · FR-051–057</a><a class="ref" href="#refs" title="src/reconcile.sh · compute_drift"><span class="cite-t code">code</span>src/reconcile.sh · compute_drift</a><a class="ref" href="#refs" title="003 · spec.md · evolution · Principle IV redefinition"><span class="cite-t spec">spec</span>003 · spec.md · evolution</a><a class="ref" href="#refs" title="003 · research.md · §3 gap"><span class="cite-t spec">spec</span>003 · research.md · §3 gap</a><a class="ref" href="#refs" title="003 · research.md · §1–2"><span class="cite-t spec">spec</span>003 · research.md · §1–2</a><a class="ref" href="#refs" title="src/git_helpers.sh · spec_dir_last_commit"><span class="cite-t code">code</span>src/git_helpers.sh · spec_dir_last_commit</a></div></section><hr class="divider"><section id="engine"><span class="anchor"></span><span class="sec-num">05 — Seeing the shape</span><h2>The synthesis engine</h2><p class="lead">Adapters feed one source-agnostic core; the core builds bottom-up; positions evolve over time.</p><p class="pull">The core never knows what a &quot;spec&quot; is — every source becomes a uniform, source-typed corpus.</p><figure class="fig fig-hub"><svg id="fig4" viewBox="0 0 1000 470" role="img" aria-label="Adapters feed one source-agnostic core"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">Adapters feed one source-agnostic core</text><g transform="translate(0,50)"><defs><radialGradient id="fig4-hub" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#cf9a3c"/><stop offset="1" stop-color="#a8742a"/></radialGradient></defs><line class="hub-spoke" x1="500" y1="210" x2="500" y2="38" stroke="#b3a98d" stroke-width="1.5"/><line class="hub-spoke" x1="500" y1="210" x2="672" y2="210" stroke="#b3a98d" stroke-width="1.5"/><line class="hub-spoke" x1="500" y1="210" x2="500" y2="382" stroke="#b3a98d" stroke-width="1.5"/><line class="hub-spoke" x1="500" y1="210" x2="328" y2="210" stroke="#b3a98d" stroke-width="1.5"/><g class="d-node act hub-node" data-cap="spec-kit folders → fragments."><rect x="420" y="16" width="160" height="44" rx="6" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="43" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" text-anchor="middle">spec adapter</text></g><g class="d-node act hub-node" data-cap="source tree → fragments."><rect x="592" y="188" width="160" height="44" rx="6" fill="#fbf9f2" stroke="#b3a98d"/><text x="672" y="215" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" text-anchor="middle">code adapter</text></g><g class="d-node act hub-node" data-cap="ADRs / design docs → fragments."><rect x="420" y="360" width="160" height="44" rx="6" fill="#fbf9f2" stroke="#b3a98d"/><text x="500" y="387" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" text-anchor="middle">design-doc</text></g><g class="d-node act hub-node" data-cap="One source-typed fragment corpus."><rect x="248" y="188" width="160" height="44" rx="6" fill="#fbf9f2" stroke="#b3a98d"/><text x="328" y="215" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" text-anchor="middle">corpus</text></g><circle class="hub-ring" cx="500" cy="210" r="104" fill="none" stroke="#2c4a63" stroke-width="2.5" stroke-dasharray="7 6"/><g class="d-node act hub-core" data-cap="The source-blind reconcile core."><circle cx="500" cy="210" r="78" fill="url(#fig4-hub)"/><text x="500" y="216" font-family="'Fraunces', Georgia, serif" font-size="18" fill="#fffaf0" font-weight="600" text-anchor="middle">core</text></g></g></svg><figcaption id="cap-fig4"><b>Fig. 4</b> — hover a node to explain · click to jump.</figcaption></figure><figure class="fig fig-stack"><svg id="fig5" viewBox="0 0 1000 254" role="img" aria-label="Three layers, built bottom-up"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">Three layers, built bottom-up</text><g transform="translate(0,50)"><defs><marker id="fig5-af" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#a8742a"/></marker><marker id="fig5-am" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#b3a98d"/></marker></defs><g class="d-node act stack-layer a2"><rect x="80" y="30" width="840" height="46" rx="8" fill="#d9e2ea" stroke="#b3a98d"/><text x="500" y="57" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12.5" fill="#3a3324" text-anchor="middle">render — model → one HTML file</text></g><g class="d-node act stack-layer a1"><rect x="80" y="88" width="840" height="46" rx="8" fill="#dce8d6" stroke="#b3a98d"/><text x="500" y="115" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12.5" fill="#3a3324" text-anchor="middle">core — extract · reconcile · compose · verify</text></g><g class="d-node act stack-layer a0"><rect x="80" y="146" width="840" height="46" rx="8" fill="#f0dccb" stroke="#b3a98d"/><text x="500" y="173" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12.5" fill="#3a3324" text-anchor="middle">adapters — spec · code · design-doc → corpus</text></g></g></svg><figcaption id="cap-fig5"><b>Fig. 5</b> — hover a node to explain · click to jump.</figcaption></figure><details class="mod" id="engine-tech"><summary><span class="mt">Technical detail</span><span class="mx">+</span></summary><div class="body"><figure class="fig fig-timeline"><svg id="fig6" viewBox="0 0 1000 250" role="img" aria-label="How a position evolves"><text x="40" y="34" font-family="'Fraunces', Georgia, serif" font-weight="600" font-size="19" fill="#16140f">How a position evolves</text><g transform="translate(0,50)"><defs><linearGradient id="fig6-tl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9b3022"/><stop offset="0.6" stop-color="#a8742a"/><stop offset="1" stop-color="#3f5d3a"/></linearGradient></defs><line class="tl-line" x1="80" y1="110" x2="920" y2="110" stroke="url(#fig6-tl)" stroke-width="5"/><g class="tl-node" data-at="0.1" data-cap="first claim"><circle cx="80" cy="110" r="8" fill="#a8742a"/><text x="80" y="92" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" font-weight="500" text-anchor="middle">draft</text><text x="80" y="140" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="11" fill="#7d705a" letter-spacing=".12em" text-anchor="middle">first claim</text></g><g class="tl-node" data-at="0.45" data-cap="superseded"><circle cx="500" cy="110" r="8" fill="#a8742a"/><text x="500" y="92" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" font-weight="500" text-anchor="middle">revised</text><text x="500" y="140" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="11" fill="#7d705a" letter-spacing=".12em" text-anchor="middle">superseded</text></g><g class="tl-node" data-at="0.8" data-cap="in narrative" data-target="#authority"><circle cx="920" cy="110" r="8" fill="#a8742a"/><text x="920" y="92" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="12" fill="#16140f" font-weight="500" text-anchor="middle">current</text><text x="920" y="140" font-family="'Spline Sans Mono', ui-monospace, Menlo, monospace" font-size="11" fill="#7d705a" letter-spacing=".12em" text-anchor="middle">in narrative</text></g></g></svg><figcaption id="cap-fig6"><b>Fig. 6</b> — hover a node to explain · click to jump.</figcaption></figure></div></details><div class="srcline"><span class="srclab">Sources</span><a class="ref" href="#refs" title="DESIGN.md · §11.1 the seam"><span class="cite-t doc">doc</span>DESIGN.md · §11.1 the seam</a><a class="ref" href="#refs" title="DESIGN.md · §11.1 · the source-agnostic seam"><span class="cite-t doc">doc</span>DESIGN.md · §11.1</a><a class="ref" href="#refs" title="adapter_speckit.py"><span class="cite-t code">code</span>adapter_speckit.py</a><a class="ref" href="#refs" title="DESIGN.md · §11.1 three layers"><span class="cite-t doc">doc</span>DESIGN.md · §11.1 three layers</a><a class="ref" href="#refs" title="DESIGN.md · §3 history"><span class="cite-t doc">doc</span>DESIGN.md · §3 history</a></div></section>
+</div>
+<div class="wrap"><footer id="refs"><span class="anchor"></span><span class="sec-num">Appendix</span><h3>References &amp; build</h3><p style="font-size:.86rem;max-width:74ch">Every source consulted, resolved to its locator — the resolved form of the model's source references, the same data the fail-closed gate checks.</p><div class="reflist"><p><span class="reftype spec">spec</span>001 · spec.md · Overview · Overview, FR-001</p><p><span class="reftype spec">spec</span>constitution · Principles I–II · Filesystem is the single source of truth</p><p><span class="reftype spec">spec</span>001 · spec.md · Overview</p><p><span class="reftype spec">spec</span>001 · plan.md · two layers</p><p><span class="reftype code">code</span>src/reconcile.sh · the single reconcile entry point</p><p><span class="reftype spec">spec</span>001 · spec.md</p><p><span class="reftype code">code</span>src/reconcile.sh</p><p><span class="reftype spec">spec</span>001 · research.md · §15 state · Decision 15</p><p><span class="reftype spec">spec</span>001 · spec.md · mapping table</p><p><span class="reftype spec">spec</span>001 · data-model.md · 9-phase lifecycle · §6.1 lifecycle state machine</p><p><span class="reftype spec">spec</span>001 · contracts/config-schema.json · UUID-keyed workflow states</p><p><span class="reftype spec">spec</span>003 · spec.md · FR-051–057 · drift-aware write authority</p><p><span class="reftype code">code</span>src/reconcile.sh · compute_drift</p><p><span class="reftype spec">spec</span>003 · spec.md · evolution · Principle IV redefinition</p><p><span class="reftype spec">spec</span>003 · research.md · §3 gap</p><p><span class="reftype spec">spec</span>003 · research.md · §1–2</p><p><span class="reftype code">code</span>src/git_helpers.sh · spec_dir_last_commit</p><p><span class="reftype doc">doc</span>DESIGN.md · §11.1 the seam</p><p><span class="reftype doc">doc</span>DESIGN.md · §11.1 · the source-agnostic seam</p><p><span class="reftype code">code</span>adapter_speckit.py</p><p><span class="reftype doc">doc</span>DESIGN.md · §11.1 three layers</p><p><span class="reftype doc">doc</span>DESIGN.md · §3 history</p></div><table class="colophon"><tbody><tr><th>Document</th><td>Architecture Storybook — speckit-linear</td></tr><tr><th>Build</th><td><span class="vtag">deterministic</span></td></tr><tr><th>Sources</th><td>code · design-doc · spec</td></tr><tr><th>Gate</th><td>fail-closed · 6 checks</td></tr></tbody></table><div class="genline"><span class="gm">●</span> Generated by <a href="https://github.com/ashbrener/spec-kit-synthesis" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a> — a faithful synthesis of many sources into one architecture narrative. Organised by architecture, not authoring history. Every claim is traceable to its source.</div></footer></div>
+<script>(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var nav=document.getElementById('toc'), btn=document.getElementById('navbtn'),
+      links=document.getElementById('toclinks'), curEl=document.getElementById('navcur');
+  var anchors = links ? Array.prototype.slice.call(links.querySelectorAll('a')) : [];
+
+  function setOpen(open){ if(!nav)return; nav.classList.toggle('open',open); if(btn) btn.setAttribute('aria-expanded',open?'true':'false'); }
+  if(btn) btn.addEventListener('click', function(){ setOpen(!nav.classList.contains('open')); });
+  anchors.forEach(function(a){ a.addEventListener('click', function(){ if(curEl) curEl.textContent=a.textContent; setOpen(false); }); });
+  document.addEventListener('click', function(e){ if(nav && nav.classList.contains('open') && !nav.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') setOpen(false); });
+
+  /* scrollspy */
+  var targets = anchors.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); }).filter(Boolean);
+  function setActive(a){ if(!a||a.classList.contains('active'))return; anchors.forEach(function(x){x.classList.remove('active');}); a.classList.add('active'); if(curEl) curEl.textContent=a.textContent;
+    if(links && links.scrollWidth>links.clientWidth){ var lr=links.getBoundingClientRect(),ar=a.getBoundingClientRect(); if(ar.left<lr.left||ar.right>lr.right){ links.scrollLeft += (ar.left-lr.left)-(lr.width-ar.width)/2; } } }
+  function recompute(){ var line=100,best=null,bd=Infinity; targets.forEach(function(t){ var top=t.getBoundingClientRect().top,d=line-top; if(d>=0&&d<bd){bd=d;best=t.id;} }); if(!best&&targets[0])best=targets[0].id; var a=anchors.find(function(x){return x.getAttribute('href')==='#'+best;}); setActive(a); }
+  if(targets.length){ var tick=false; window.addEventListener('scroll',function(){ if(!tick){tick=true;requestAnimationFrame(function(){recompute();tick=false;});} },{passive:true}); window.addEventListener('resize',recompute,{passive:true}); recompute(); }
+
+  /* open a targeted disclosure on hash */
+  function openHash(){ if(location.hash){ var t; try{t=document.querySelector(location.hash);}catch(e){return;} if(t&&t.tagName&&t.tagName.toLowerCase()==='details') t.setAttribute('open',''); } }
+  window.addEventListener('hashchange', openHash); openHash();
+
+  /* e/c expand-collapse all disclosures */
+  document.addEventListener('keydown', function(e){ if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
+    if(e.key==='e') document.querySelectorAll('details.mod').forEach(function(d){d.setAttribute('open','');});
+    if(e.key==='c') document.querySelectorAll('details.mod').forEach(function(d){d.removeAttribute('open');}); });
+
+  /* diagrams: hover-to-explain + click-to-jump */
+  document.querySelectorAll('figure svg').forEach(function(svg){
+    var cap = svg.parentNode.querySelector('figcaption'); var base = cap ? cap.innerHTML : '';
+    svg.querySelectorAll('[data-cap]').forEach(function(n){
+      n.addEventListener('mouseenter', function(){ if(cap) cap.textContent=n.getAttribute('data-cap'); });
+      n.addEventListener('mouseleave', function(){ if(cap) cap.innerHTML=base; });
+    });
+    svg.querySelectorAll('[data-target]').forEach(function(n){
+      n.addEventListener('click', function(e){ e.stopPropagation(); var t; try{t=document.querySelector(n.getAttribute('data-target'));}catch(err){return;} if(t) t.scrollIntoView({behavior:reduce?'auto':'smooth'}); });
+    });
+  });
+
+  /* figure reveal + timeline scrub + brand motion */
+  var figs = Array.prototype.slice.call(document.querySelectorAll('figure'));
+  if(reduce || !('IntersectionObserver' in window)){
+    figs.forEach(function(f){ f.classList.add('in'); });
+    var nm0=document.querySelector('.brand-mark'); if(nm0) nm0.classList.add('show');
+  } else {
+    var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } }); }, {rootMargin:'0px 0px -10% 0px',threshold:0.15});
+    figs.forEach(function(f){ io.observe(f); });
+    requestAnimationFrame(function(){ figs.forEach(function(f){ if(f.getBoundingClientRect().top<window.innerHeight*0.9) f.classList.add('in'); }); });
+
+    var scrubbed = Array.prototype.slice.call(document.querySelectorAll('.fig-timeline'));
+    scrubbed.forEach(function(f){ f.classList.add('scrubbed'); });
+    function scrub(){ var vh=window.innerHeight; scrubbed.forEach(function(f){ var r=f.getBoundingClientRect(); var p=(vh*0.85 - r.top)/(vh*0.35); p=Math.max(0,Math.min(1,p)); f.style.setProperty('--p',p.toFixed(3)); f.querySelectorAll('[data-at]').forEach(function(el){ el.classList.toggle('lit', p>=parseFloat(el.getAttribute('data-at'))); }); }); }
+    if(scrubbed.length){ var st=false; window.addEventListener('scroll',function(){ if(!st){st=true;requestAnimationFrame(function(){scrub();st=false;});} },{passive:true}); window.addEventListener('resize',scrub,{passive:true}); scrub(); }
+
+    var stars=Array.prototype.slice.call(document.querySelectorAll('.spin-star'));
+    if(stars.length){ var lastY=window.pageYOffset||0,ang=0,sp=false; function spin(){ var y=window.pageYOffset||0; ang+=(y-lastY)*0.18; lastY=y; var v=ang.toFixed(1)+'deg'; stars.forEach(function(s){ s.style.setProperty('--spin',v); }); sp=false; } window.addEventListener('scroll',function(){ if(!sp){sp=true;requestAnimationFrame(spin);} },{passive:true}); }
+
+    var mast=document.querySelector('.brand-logo'), navMark=document.querySelector('.brand-mark');
+    if(mast && navMark){ var io2=new IntersectionObserver(function(es){ es.forEach(function(en){ navMark.classList.toggle('show', !en.isIntersecting); }); }, {threshold:0}); io2.observe(mast); }
+  }
+})();</script>
+</body>
+</html>

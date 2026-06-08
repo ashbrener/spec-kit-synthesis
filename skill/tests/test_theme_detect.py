@@ -38,14 +38,14 @@ def test_css_maps_paper_ink_accent(tmp_path: Path):
     assert source == "CSS custom properties"
     assert out["paper"] == "#101015"
     assert out["ink"] == "#eee"
-    assert out["accent"] == "#e3743f"
+    assert out["gold"] == "#e3743f"        # brand/primary → the accent token (gold)
 
     # flat str->str, and merges cleanly over the defaults (all strings).
     assert _is_flat_str_map(out)
     merged = _merges_clean(out)
     assert merged["paper"] == "#101015"
     # untouched tokens inherit defaults
-    assert merged["plum"] == render.DEFAULT_THEME["plum"]
+    assert merged["green"] == render.DEFAULT_THEME["green"]
 
 
 def test_css_only_emits_subset_of_allowed_tokens(tmp_path: Path):
@@ -70,8 +70,8 @@ def test_css_fonts_detected(tmp_path: Path):
         encoding="utf-8",
     )
     out, _source, _det = run(tmp_path)
-    assert out["sans"] == "'Inter', system-ui, sans-serif"
-    assert out["mono"] == "'Fira Code', monospace"
+    assert out["font-body"] == "'Inter', system-ui, sans-serif"
+    assert out["font-mono"] == "'Fira Code', monospace"
     _merges_clean(out)
 
 
@@ -82,7 +82,7 @@ def test_css_skips_var_references(tmp_path: Path):
     )
     out, _source, _det = run(tmp_path)
     # primary points at another var → unresolved → not emitted.
-    assert "accent" not in out
+    assert "gold" not in out
     assert out["paper"] == "#101015"
 
 
@@ -105,7 +105,7 @@ def test_tailwind_primary_detected(tmp_path: Path):
     )
     out, source, _det = run(tmp_path)
     assert source == "Tailwind config"
-    assert out["accent"] == "#7c3aed"
+    assert out["gold"] == "#7c3aed"
     _merges_clean(out)
 
 
@@ -126,7 +126,7 @@ def test_tailwind_nested_scale(tmp_path: Path):
     )
     out, source, _det = run(tmp_path)
     assert source == "Tailwind config"
-    assert out["accent"] == "#9333ea"  # DEFAULT preferred
+    assert out["gold"] == "#9333ea"  # DEFAULT preferred
     assert out["paper"] == "#0b0b0f"
     assert out["ink"] == "#f5f5f5"
     _merges_clean(out)
@@ -145,7 +145,7 @@ def test_css_takes_priority_over_tailwind(tmp_path: Path):
     )
     out, source, _det = run(tmp_path)
     assert source == "CSS custom properties"
-    assert out["accent"] == "#abc123"
+    assert out["gold"] == "#abc123"
 
 
 # ── nothing found ─────────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ def test_low_confidence_warning_emitted(tmp_path: Path, capsys):
     (tmp_path / "s.css").write_text(
         ":root {"
         " --background:#101015; --text:#eee; --primary:#e3743f;"
-        " --text-muted:#888;"  # → ink-2, low confidence
+        " --border-strong:#888;"  # → line-dk, low confidence
         " }",
         encoding="utf-8",
     )
@@ -199,9 +199,9 @@ def test_low_confidence_warning_emitted(tmp_path: Path, capsys):
     captured = capsys.readouterr()
     assert rc == 0
     out = json.loads(captured.out)
-    assert out["ink-2"] == "#888"
+    assert out["line-dk"] == "#888"
     assert "WARNING" in captured.err
-    assert "ink-2" in captured.err
+    assert "line-dk" in captured.err
 
 
 def test_confident_tokens_reported(tmp_path: Path, capsys):
