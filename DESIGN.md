@@ -755,6 +755,12 @@ it is this seam.
 7. **Composition ≠ markup ≠ theme.** LLM emits a document model (incl. declarative
    diagram graphs); a deterministic renderer makes interactive SVG HTML; a theme
    is cosmetic data applied at render. Three clean stages. (§6)
+8. **Written for a general reader.** The storybook is the plain-English read of the spec
+   portal for non-specialists; its prose is *deliberately simpler* than the source markdown it
+   is distilled from. Simplification is the product, not a side effect — and it is safe only
+   because every simplified claim keeps its source one click away (the citation chips, §5.1) and
+   every gap surfaces as an `unspecified` callout rather than being smoothed over. Simpler on the
+   surface, traceable underneath; **simplification never costs faithfulness.** (§1.7)
 
 ### 11.3 Resolved decisions (the flag is planted on all ten)
 
