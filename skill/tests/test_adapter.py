@@ -133,11 +133,13 @@ def test_real_speckit_linear_corpus():
     FragmentCorpus.model_validate_json(corpus.model_dump_json())
     assert len(corpus.fragments) > 0
     features = {f.feature_key for f in corpus.fragments}
-    assert features == {
+    # subset, not equality: this reads the live external speckit-linear repo, which may
+    # gain feature folders over time. The adapter must surface the original three.
+    assert {
         "001-spec-kit-linear-bridge",
         "002-install-ergonomics",
         "003-drift-aware-authority",
-    }
+    } <= features
     # every fragment is SPEC-typed with a self-referential locator
     for f in corpus.fragments:
         assert f.source.type is SourceType.SPEC

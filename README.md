@@ -66,9 +66,9 @@ flowchart TD
     classDef l2 fill:#e2ece7,stroke:#1f5048,color:#17150f
 ```
 
-Plus: hand-rendered theme-aware **SVG diagrams** (pipeline, data-model mapping, lifecycle ladder, decision flows), a light/dark toggle, a scrollspy table of contents, three callout types (**decision** · **evolution** · **unspecified**), and — when a code source is supplied — a **coverage view** that cross-checks the specified architecture against the actual code.
+Plus: hand-laid **SVG diagrams** with per-layout animation (pipeline · flow · ladder · mapping · panel · hub · stack · timeline), per-section disclosure for technical depth, a scrollspy table of contents, three callout types (**decision** · **evolution** · **unspecified**), and — when a code source is supplied — a **coverage view** that cross-checks the specified architecture against the actual code.
 
-> **See it for real.** Two generated artifacts live in [`examples/generated/`](examples/generated/) — a full architecture storybook and a coverage storybook, both produced by this tool from a real three-feature project, plus [`RESULT.md`](examples/generated/RESULT.md) recording the faithfulness review. The hand-written north-star target is [`examples/speckit-linear-architecture.html`](examples/speckit-linear-architecture.html). Open any of them in a browser and try the depth toggle + dark mode.
+> **See it for real.** Two generated artifacts live in [`examples/generated/`](examples/generated/) — a full architecture storybook and a coverage storybook, both produced by this tool from a real three-feature project, plus [`RESULT.md`](examples/generated/RESULT.md) recording the faithfulness review. The hand-written north-star target is [`examples/speckit-linear-architecture.html`](examples/speckit-linear-architecture.html). The current renderer — the editorial design system (spec [`001-renderer-v2`](specs/001-renderer-v2/)) — is shown by [`renderer-v2-sample.html`](examples/generated/renderer-v2-sample.html); open it, expand a section's *Technical detail*, then scroll to watch each diagram animate.
 
 ## Install
 
