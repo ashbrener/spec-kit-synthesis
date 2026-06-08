@@ -249,6 +249,18 @@ def test_no_raw_source_locators_in_output():
 
 # ── determinism ──────────────────────────────────────────────────────────────
 
+def test_citation_chips_resolve_to_appendix_anchors():
+    """Phase B (spec 002): a chip links to its EXACT reference entry in the appendix
+    (a deterministic #ref-<hash> anchor, not the bare #refs), and that anchor exists once."""
+    import re
+    out = render(_doc(), {})
+    hrefs = set(re.findall(r'<a class="ref" href="#(ref-[0-9a-f]+)"', out))
+    assert hrefs, "citation chips no longer resolve to per-reference anchors"
+    for a in hrefs:
+        assert out.count(f'id="{a}"') == 1, f"appendix anchor {a} missing or duplicated"
+    assert 'id="refs"' in out          # the appendix section still exists for back-nav
+
+
 def test_render_is_deterministic():
     doc = _doc()
     a = render(doc, {})

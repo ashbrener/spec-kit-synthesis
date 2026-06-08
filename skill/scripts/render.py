@@ -27,6 +27,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import math
@@ -801,10 +802,29 @@ def _render_table(rows: list[list[str]]) -> str:
     return f'<div class="tbl-scroll"><table class="tbl"><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table></div>'
 
 
+def _ref_key(ref: SourceRef) -> tuple[str, str, str, str, str]:
+    """Stable identity of a citation (including origin) — shared by appendix dedup + anchor."""
+    return (ref.type.value, ref.origin or "", ref.name, ref.locator, ref.anchor or "")
+
+
+def _ref_anchor(ref: SourceRef) -> str:
+    """Deterministic, collision-safe HTML id for this citation's References-appendix entry."""
+    h = hashlib.sha1("\x00".join(_ref_key(ref)).encode("utf-8")).hexdigest()[:10]
+    return f"ref-{h}"
+
+
+def _resolve_ref_href(ref: SourceRef) -> str:
+    """Where a citation chip points. Phase B (spec 002): the in-page References-appendix anchor
+    for this exact source. Later phases override this for cross-repo targets (a sibling page+anchor
+    or a bundled source-view), keeping the appendix anchor as the graceful fallback."""
+    return f"#{_ref_anchor(ref)}"
+
+
 def _cite_chip(ref: SourceRef) -> str:
     t = SOURCE_T.get(ref.type, "doc")
     title = ref.name + (f" · {ref.anchor}" if ref.anchor else "")
-    return f'<a class="ref" href="#refs" title="{esc(title)}"><span class="cite-t {t}">{t}</span>{esc(ref.name)}</a>'
+    href = _resolve_ref_href(ref) or "#refs"
+    return f'<a class="ref" href="{href}" title="{esc(title)}"><span class="cite-t {t}">{t}</span>{esc(ref.name)}</a>'
 
 
 def _render_callout(block: Block) -> str:
@@ -881,11 +901,11 @@ def _block_refs(block: Block):
 
 def _collect_section_refs(section: Section) -> list[SourceRef]:
     """De-duplicated union of every block's resolved source_refs (first-appearance order)."""
-    seen: set[tuple[str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str]] = set()
     ordered: list[SourceRef] = []
     for block in section.blocks:
         for r in _block_refs(block):
-            key = (r.type.value, r.name, r.locator, r.anchor or "")
+            key = _ref_key(r)
             if key not in seen:
                 seen.add(key)
                 ordered.append(r)
@@ -934,12 +954,12 @@ def _title_html(title: str, accent: Optional[str]) -> str:
 
 
 def _all_refs(doc: DocumentModel) -> list[SourceRef]:
-    seen: set[tuple[str, str, str, str]] = set()
+    seen: set[tuple[str, str, str, str, str]] = set()
     ordered: list[SourceRef] = []
     for s in doc.sections:
         for b in s.blocks:
             for r in _block_refs(b):
-                key = (r.type.value, r.name, r.locator, r.anchor or "")
+                key = _ref_key(r)
                 if key not in seen:
                     seen.add(key)
                     ordered.append(r)
@@ -963,7 +983,7 @@ def _render_nav(sections: list[Section], project: str) -> str:
 def _render_footer(doc: DocumentModel, project: str) -> str:
     refs = _all_refs(doc)
     refitems = "".join(
-        f'<p><span class="reftype {SOURCE_T.get(r.type, "doc")}">{SOURCE_T.get(r.type, "doc")}</span>'
+        f'<p id="{_ref_anchor(r)}"><span class="reftype {SOURCE_T.get(r.type, "doc")}">{SOURCE_T.get(r.type, "doc")}</span>'
         f'{esc(r.name)}{(" · " + esc(r.anchor)) if r.anchor else ""}</p>'
         for r in refs
     )
