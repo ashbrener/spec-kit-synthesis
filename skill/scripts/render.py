@@ -32,6 +32,7 @@ import html
 import json
 import math
 import sys
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Optional
 
@@ -813,10 +814,21 @@ def _ref_anchor(ref: SourceRef) -> str:
     return f"ref-{h}"
 
 
+# Optional cross-repo resolver, injected per render() call by the portal (spec 002, Phase E):
+# a SourceRef -> href|None callable. Held in a context var so chip rendering needs no signature
+# threading and stays reentrancy-safe.
+_RESOLVE: ContextVar = ContextVar("synthesis_resolve", default=None)
+
+
 def _resolve_ref_href(ref: SourceRef) -> str:
-    """Where a citation chip points. Phase B (spec 002): the in-page References-appendix anchor
-    for this exact source. Later phases override this for cross-repo targets (a sibling page+anchor
-    or a bundled source-view), keeping the appendix anchor as the graceful fallback."""
+    """Where a citation chip points. A portal may inject a resolver (Phase E) to drill a chip
+    ACROSS pages (docs -> spec -> code); absent or unmatched, it falls back to the in-page
+    References-appendix anchor for this exact source (Phase B). Deterministic either way."""
+    resolve = _RESOLVE.get()
+    if resolve is not None:
+        href = resolve(ref)
+        if href:
+            return href
     return f"#{_ref_anchor(ref)}"
 
 
@@ -1078,8 +1090,20 @@ JS = r"""(function(){
 })();"""
 
 
-def render(doc: DocumentModel, theme: dict[str, str]) -> str:
-    """Pure: DocumentModel + theme tokens → a complete HTML document string."""
+def render(doc: DocumentModel, theme: dict[str, str], resolve=None) -> str:
+    """Pure: DocumentModel + theme tokens → a complete HTML document string.
+
+    `resolve` (optional, portal Phase E): a SourceRef -> href|None callable to drill a citation
+    chip ACROSS pages; absent or unmatched, chips resolve to the in-page References appendix.
+    Deterministic for fixed inputs."""
+    token = _RESOLVE.set(resolve)
+    try:
+        return _render_doc(doc, theme)
+    finally:
+        _RESOLVE.reset(token)
+
+
+def _render_doc(doc: DocumentModel, theme: dict[str, str]) -> str:
     merged = {**DEFAULT_THEME, **theme}
     css = build_css(merged)
     project = doc.project_name or doc.title
