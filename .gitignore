@@ -10,3 +10,13 @@ __pycache__/
 # per-run build artifacts (stateless; regenerated each run — DESIGN §11.2 #4)
 # .synthesis/ is the default work dir; .synthesis-<name>/ are scratch dogfood dirs
 .synthesis*/
+
+# Spec-kit self-host (sibling convention): COMMIT the scaffold
+# (.specify/scripts, /templates, /memory/constitution.md) — ignore only runtime + per-checkout state.
+.specify/cache/
+.specify/feature.json
+
+# Claude Code local-only (tracked: .claude/skills, .claude/commands; ignored: machine state)
+.claude/settings.local.json
+.claude/worktrees/
+.mcp.json
