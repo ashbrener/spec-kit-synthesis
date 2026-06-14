@@ -8,7 +8,7 @@
 
 **Input**: User direction: "We can't modify our html template to be like this one. We need
 to modify our model to fit into the framework of the design system. This being the default
-one, barring the a-brand branding." Plus: "SVG diagrams are important … all animations need
+one, barring the bespoke branding." Plus: "SVG diagrams are important … all animations need
 to be appropriate for the diagram, not 1 size fits all." Design context: `DESIGN.md` §6/§11,
 the scrubbed visual contract at `skill/templates/storybook.html`, and the plan at
 `specs/001-renderer-v2/plan.md`.

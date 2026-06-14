@@ -2,7 +2,7 @@
 fragments so the source-view renderer can render them and claims can cite them.
 
 Covers both example layouts:
-  * ungoverned: 02_System_Architecture/ADRs/ADR-005-*.md   (a-workspace docs)
+  * ungoverned: a published docs tree, e.g. docs/architecture/ADRs/ADR-005-*.md
   * governed:   docs/adr/<NS>-ADR-NNN-*.md
 plus the --adr-dir override (a repo's declared adr_dir forces kind='adr').
 

@@ -70,7 +70,7 @@ primitive**: it resolves to a sibling page+anchor (docs→spec) or a bundled sou
 - **Atlas — renders the verified graph, coverage-honest.** The atlas is a deterministic page driven
   by the verified `LinkGraph`, drawn with the existing `DiagramGraph` `hub`/`stack` layouts. It lifts
   the §5.8 coverage-honesty invariant: it never implies a complete intent→docs→specs→code chain when
-  the real repos populate only part of it (a-repo: docs+code, no specs; speckit-linear: specs, no
+  the real repos populate only part of it (e.g. one repo with docs+code but no specs; another with specs, no
   docs). A *synthesized meta-narrative* atlas is deferred.
 - **Intent + workspace root.** `intent` is an **optional** origin — rendered honestly-absent rather
   than invented; a Linear/issues adapter is added later only if real intent artifacts exist. The

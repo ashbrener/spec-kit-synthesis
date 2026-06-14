@@ -51,8 +51,8 @@ untouched — this is purely an additive read surface (DESIGN §1.7 Layer-2).
 1. `render_sources.py` + unit tests (pages emitted per file, anchors present, resolver maps
    locators, determinism, no content lost).
 2. Wire `synthesize.py`; regenerate the e2e fixture storybook; eyeball drill-down.
-3. Wire `synthesize_atlas.py` (portal) + compose resolvers; dogfood on a-workspace (the docs portal —
-   its 22 ADRs + specs become reachable).
+3. Wire `synthesize_atlas.py` (portal) + compose resolvers; dogfood on a real multi-repo
+   workspace (a docs portal — its ADRs + specs become reachable).
 4. Docs: SKILL.md + README note the source-view layer; `examples/` refreshed.
 
 ## Out of scope

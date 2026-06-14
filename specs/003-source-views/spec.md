@@ -21,7 +21,7 @@ the fail-closed verify gate.
 - **An evaluator** reading the storybook clicks a citation chip and lands on the cited spec
   section, rendered legibly (headings, tables, code, Mermaid) — without leaving the portal or
   opening a raw `.md` file.
-- **An engineer** in the a-workspace portal opens the `docs` page, clicks a chip on an architecture
+- **An engineer** in a multi-repo portal opens the `docs` page, clicks a chip on an architecture
   claim, and reads the underlying ADR/spec section that backs it.
 
 ## Functional requirements
@@ -55,7 +55,7 @@ the fail-closed verify gate.
 ## Success criteria
 
 - **SC-001**: From a generated storybook, clicking a citation chip opens the cited source
-  section rendered as HTML — verified on the a-workspace docs portal (22 ADRs + specs reachable).
+  section rendered as HTML — verified on a real docs portal (its ADRs + specs reachable).
 - **SC-002**: No source content is lost: every fragment's text appears on its file's page.
 - **SC-003**: `verify.py` behaviour is unchanged (0/0 on a faithful model); the engine and IR
   contracts are untouched.
