@@ -2,8 +2,8 @@
 
 **Synthesize a project's scattered spec-kit specs into one readable, beautiful, interactive whole-system architecture document.** Where `/speckit.clarify` checks one spec for correctness and `/speckit.analyze` checks consistency, this reads *all* of them — overlapping, evolving, sometimes contradictory — and reasons them into a single current-state architecture storybook, organized by structure, not by spec history.
 
-- **What it is:** a Claude Code skill (the in-session agent is the reasoning engine — no API key, no subprocess)
-- **Output:** one self-contained, interactive HTML document
+- **What it is:** a Claude Code plugin with two skills — `speckit-storybook` (one repo → one storybook) and `speckit-atlas` (a workspace of repos → a documentation portal). The in-session agent is the reasoning engine — no API key, no subprocess.
+- **Output:** one self-contained, interactive HTML document — or a whole static portal of them
 - **Toolchain:** [`uv`](https://docs.astral.sh/uv/) · Python ≥ 3.11
 - **Status:** Phases 1–3 shipped, each judged faithful (0/0/0) by independent cross-model review
 - **License:** MIT
@@ -72,12 +72,20 @@ Plus: hand-laid **SVG diagrams** with per-layout animation (pipeline · flow · 
 
 ## Install
 
-This is a Claude Code skill. Point Claude Code at this repo (or copy `skill/` into your skills directory). The deterministic scripts run via `uv`, which builds its environment on first run — no manual setup.
+This is a Claude Code **plugin** (`.claude-plugin/plugin.json`) bundling two skills — `speckit-storybook` and `speckit-atlas`. Install it so the skills are namespaced as `/spec-kit-synthesis:speckit-storybook` and `/spec-kit-synthesis:speckit-atlas`:
 
 ```bash
 git clone https://github.com/ashbrener/spec-kit-synthesis.git
+# then add it as a plugin from a local marketplace, or symlink it under your plugins dir
+```
+
+The skills reference their deterministic scripts via `${CLAUDE_PLUGIN_ROOT}`, so as an installed plugin run them against the plugin's own project — `uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/<script>.py" …`. `uv` builds the environment on first run (only `pydantic`); no manual setup.
+
+For in-repo development (the script paths below drop the `${CLAUDE_PLUGIN_ROOT}` prefix):
+
+```bash
 cd spec-kit-synthesis
-uv run pytest skill/tests -q     # optional: confirm the toolchain (91 tests)
+uv run pytest skill/tests -q     # confirm the toolchain
 ```
 
 ## Usage
@@ -114,6 +122,24 @@ uv run python skill/scripts/synthesize.py path/to/specs \
 
 The individual stages are also runnable directly (`adapter_speckit.py`, `adapter_code.py`, `adapter_doc.py`, `verify.py`, `render.py`); `synthesize.py` orchestrates them.
 
+## Many repos → one portal (`speckit-atlas`)
+
+When the story spans repositories — a docs repo, the spec-kit specs behind it, the backend/frontend that implement it — the `speckit-atlas` skill federates them into one static documentation portal: **a faithful plain-English storybook per repo, plus a verified `docs↔specs↔code` traceability atlas.** Each page is built by the exact same engine as a single repo; the portal layer (index + atlas + cross-repo links) is purely additive and never touches per-page reasoning.
+
+You describe the workspace in a `synthesis.workspace.json` next to the repos, then run the portal front door twice (adapt → the agent reasons each member → verify + render):
+
+```bash
+# 1. Adapt every member, get the per-member hand-off brief
+uv run python skill/scripts/synthesize_atlas.py synthesis.workspace.json --work .synthesis-portal
+#    … the in-session agent reasons each member's architecture_model + document_model
+#      into .synthesis-portal/<origin>/, using only that member's locators …
+# 2. Verify cross-repo links (fail-closed) + render the whole site
+uv run python skill/scripts/synthesize_atlas.py synthesis.workspace.json \
+    --work .synthesis-portal --out site/
+```
+
+The result in `site/` is self-contained — `index.html` (book-of-books), one page per repo, and `atlas.html` (the verified graph). Host it on Netlify/Vercel or open `index.html` directly; no checkout, no auth, no server. Repos that aren't checked out can be marked `"optional": true` (skipped with a warning, coverage-honest) or carry a `url`+`pin` to be fetched. Cross-repo links are **fail-closed**: an edge ships only with real evidence (declared in the manifest, a shared qualified identifier, or a literal prose quote), gated by `verify_links.py`. See [`skills/speckit-atlas/SKILL.md`](skills/speckit-atlas/SKILL.md) for the manifest format and the full algorithm.
+
 ## The hard-and-fast rule: faithful, or it doesn't ship
 
 *A confident, wrong architecture document is worse than none.* Faithfulness is an architectural invariant, enforced two ways:
@@ -138,18 +164,25 @@ All merge into one collision-checked corpus. Citations are **source-typed**, so 
 ## How it's organized
 
 ```
+.claude-plugin/
+  plugin.json               the plugin manifest (name, two skills, scripts)
+skills/
+  speckit-storybook/SKILL.md  one repo → one storybook (the page engine + its algorithm)
+  speckit-atlas/SKILL.md      a workspace of repos → a documentation portal (the SITE layer)
 skill/
-  SKILL.md                  the orchestration algorithm (the agent's instructions)
-  scripts/
-    schema.py               the IR contracts (source-typed provenance, altitudes, coverage)
+  scripts/                  shared deterministic engine (both skills call these)
+    schema.py               the IR contracts (source-typed provenance, altitudes, coverage, links)
     adapter_speckit.py      spec folders   → fragment corpus
     adapter_code.py         a source tree  → fragment corpus  (coverage)
     adapter_doc.py          design docs/ADRs → fragment corpus
-    verify.py               fail-closed faithfulness gate
+    verify.py               fail-closed faithfulness gate (per page)
     render.py               document model + theme → interactive SVG HTML
     theme_detect.py         host CSS/Tailwind tokens → a theme
-    synthesize.py           the one-command front door
-  tests/                    91 tests (uv run pytest skill/tests -q)
+    synthesize.py           the one-command front door (single repo)
+    synthesize_atlas.py     the portal front door (workspace → site)
+    discover_links.py       declared + shared-identifier cross-repo edges
+    verify_links.py         fail-closed cross-repo link gate
+  tests/                    the test suite (uv run pytest skill/tests -q)
 examples/                   the north-star target + generated results
 DESIGN.md                   the full design rationale — read §11 for the resolved architecture
 ```
