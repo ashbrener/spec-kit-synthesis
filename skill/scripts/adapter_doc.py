@@ -52,9 +52,18 @@ SKIP_DIRS = {
 
 # ── ADR detection (deterministic, path-based) ───────────────────────────────
 # A doc is an ADR if any path part names an ADR location, or the filename is an
-# ADR-style numbered record (e.g. 0001-use-uv.md, ADR-007-foo.md).
+# ADR-style numbered record. Two filename shapes are recognised (FR-008):
+#   * plain numbered:   0001-use-uv.md, ADR-007-foo.md
+#   * governed/namespaced: CORE-ADR-002-event-bus.md, PLAT-ADR-014-thing.md
 _ADR_DIR_PARTS = {"adr", "adrs", "decisions", "decision-records"}
-_ADR_FILENAME_RE = re.compile(r"^(?:adr[-_])?\d{3,4}[-_].+", re.IGNORECASE)
+_ADR_FILENAME_RE = re.compile(
+    r"^(?:[a-z0-9]+[-_])?adr[-_]\d{1,4}[-_].+|^\d{3,4}[-_].+",
+    re.IGNORECASE,
+)
+# Pull a stable ADR id (e.g. 'ADR-005', 'CORE-ADR-002', '0001') out of a filename.
+_ADR_ID_RE = re.compile(
+    r"^(?P<id>(?:[a-z0-9]+-)?adr-\d{1,4}|\d{3,4})", re.IGNORECASE
+)
 
 
 def _slugify(text: str) -> str:
@@ -64,12 +73,28 @@ def _slugify(text: str) -> str:
     return text.strip("-") or "section"
 
 
-def _is_adr(rel: str) -> bool:
-    """Classify a doc as an ADR by its path/filename (deterministic)."""
+def _is_adr(rel: str, adr_root: Optional[str] = None) -> bool:
+    """Classify a doc as an ADR by its path/filename (deterministic).
+
+    When `adr_root` is set (a caller-declared ADR directory, e.g. a repo's
+    `adr_dir`), every doc at or below it is an ADR regardless of filename shape.
+    """
+    if adr_root is not None and (rel == adr_root or rel.startswith(adr_root + "/")):
+        return True
     parts = rel.split("/")
     if any(part.lower() in _ADR_DIR_PARTS for part in parts[:-1]):
         return True
     return bool(_ADR_FILENAME_RE.match(parts[-1]))
+
+
+def _adr_id(rel: str) -> Optional[str]:
+    """Extract a stable ADR id from a filename for use as the feature_key.
+
+    Normalises the matched id to upper-case ('CORE-ADR-002', 'ADR-005'); a bare
+    numbered record ('0001-use-uv.md') yields its number ('0001'). Returns None
+    when the filename carries no recognisable id (e.g. a README in an adr dir)."""
+    m = _ADR_ID_RE.match(Path(rel).name)
+    return m.group("id").upper() if m else None
 
 
 def _split_sections(text: str) -> list[tuple[str, str]]:
@@ -119,11 +144,13 @@ def _feature_key(rel: str) -> str:
     return Path(parts[-1]).stem
 
 
-def _fragments_for_file(rel: str, text: str) -> list[Fragment]:
-    is_adr = _is_adr(rel)
+def _fragments_for_file(rel: str, text: str, adr_root: Optional[str] = None) -> list[Fragment]:
+    is_adr = _is_adr(rel, adr_root)
     kind = "adr" if is_adr else "design-doc"
     chip = "adr" if is_adr else "doc"
-    feature_key = _feature_key(rel)
+    # An ADR groups under its own id (ADR-005 / CORE-ADR-002 — FR-008) when the
+    # filename carries one; otherwise it falls back to the dir/stem grouping.
+    feature_key = (_adr_id(rel) if is_adr else None) or _feature_key(rel)
 
     sections = _split_sections(text)
     single = len(sections) <= 1  # keep small/whole/headingless files as one fragment
@@ -162,31 +189,63 @@ def _fragments_for_file(rel: str, text: str) -> list[Fragment]:
 
 
 def build_corpus(
-    docs_dir: Path, project_name: Optional[str] = None, exts: Optional[set[str]] = None
+    docs_dir: Path,
+    project_name: Optional[str] = None,
+    exts: Optional[set[str]] = None,
+    adr_dir: Optional[Path] = None,
 ) -> FragmentCorpus:
-    """Walk `<docs_dir>` and build a validated DESIGN_DOC FragmentCorpus."""
+    """Walk `<docs_dir>` and build a validated DESIGN_DOC FragmentCorpus.
+
+    `adr_dir` (a repo's declared `adr_dir`, e.g. ``docs/adr`` or
+    ``02_System_Architecture/ADRs``) forces every markdown doc at or below it to
+    `kind="adr"` regardless of filename shape (FR-008). It may be absolute or
+    relative to `docs_dir`; if it lies outside the walked tree the docs there are
+    still ingested, so a repo whose ADRs live outside its docs tree is reachable.
+    """
     docs_dir = docs_dir.resolve()
     if not docs_dir.is_dir():
         raise NotADirectoryError(f"docs dir not found: {docs_dir}")
     exts = exts or DEFAULT_EXTS
 
-    files: list[Path] = []
-    for p in sorted(docs_dir.rglob("*")):
-        if not p.is_file():
-            continue
-        if any(part in SKIP_DIRS for part in p.relative_to(docs_dir).parts):
-            continue
-        if p.suffix.lower() in exts:
-            files.append(p)
-
-    # deterministic order across the whole tree, then stable within each file.
-    files.sort(key=lambda p: p.relative_to(docs_dir).as_posix())
+    # Roots to walk, each paired with the relpath-prefix that marks an ADR within
+    # it (None = use filename/dir heuristics only). The docs tree comes first;
+    # an out-of-tree adr_dir is appended as a second root so it is still ingested.
+    roots: list[tuple[Path, Optional[str]]] = [(docs_dir, None)]
+    adr_resolved: Optional[Path] = None
+    if adr_dir is not None:
+        adr_resolved = adr_dir if adr_dir.is_absolute() else (docs_dir / adr_dir)
+        adr_resolved = adr_resolved.resolve()
+        if not adr_resolved.is_dir():
+            raise NotADirectoryError(f"adr dir not found: {adr_resolved}")
+        try:
+            # adr_dir is inside the docs tree → mark it as an ADR-prefix on the docs root.
+            in_tree = adr_resolved.relative_to(docs_dir).as_posix()
+            roots = [(docs_dir, in_tree)]
+        except ValueError:
+            # adr_dir is outside the docs tree → walk it as its own ADR root.
+            roots.append((adr_resolved, ""))
 
     frags: list[Fragment] = []
-    for p in files:
-        rel = p.relative_to(docs_dir).as_posix()
-        text = p.read_text(encoding="utf-8", errors="replace")
-        frags.extend(_fragments_for_file(rel, text))
+    seen_ids: set[str] = set()
+    for root, adr_root in roots:
+        files: list[Path] = []
+        for p in sorted(root.rglob("*")):
+            if not p.is_file():
+                continue
+            if any(part in SKIP_DIRS for part in p.relative_to(root).parts):
+                continue
+            if p.suffix.lower() in exts:
+                files.append(p)
+        # deterministic order across the tree, then stable within each file.
+        files.sort(key=lambda p: p.relative_to(root).as_posix())
+        for p in files:
+            rel = p.relative_to(root).as_posix()
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for frag in _fragments_for_file(rel, text, adr_root):
+                if frag.id in seen_ids:  # de-dup overlapping roots (idempotent)
+                    continue
+                seen_ids.add(frag.id)
+                frags.append(frag)
 
     return FragmentCorpus(
         project_name=project_name or docs_dir.name,
@@ -201,6 +260,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("docs_dir", help="Path to the docs directory of markdown design docs / ADRs.")
     parser.add_argument("--project-name", default=None, help="Display name for the FragmentCorpus.")
     parser.add_argument("--include", default=None, help="Comma-separated extensions (e.g. md,markdown) to override defaults.")
+    parser.add_argument(
+        "--adr-dir",
+        default=None,
+        help="A repo's ADR directory (e.g. docs/adr or 02_System_Architecture/ADRs); "
+        "every markdown doc at/below it is ingested as kind='adr' (FR-008). "
+        "Absolute, or relative to docs_dir.",
+    )
     parser.add_argument("--out", default=None, help="Write JSON here (default: stdout).")
     args = parser.parse_args(argv)
 
@@ -213,7 +279,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.include
         else DEFAULT_EXTS
     )
-    corpus = build_corpus(docs, args.project_name, exts)
+    adr_dir = Path(args.adr_dir) if args.adr_dir else None
+    corpus = build_corpus(docs, args.project_name, exts, adr_dir=adr_dir)
     payload = corpus.model_dump_json(indent=2)
     if args.out:
         Path(args.out).write_text(payload + "\n", encoding="utf-8")

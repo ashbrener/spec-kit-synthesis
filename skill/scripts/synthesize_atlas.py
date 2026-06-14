@@ -43,6 +43,7 @@ import adapter_doc  # noqa: E402
 import adapter_speckit  # noqa: E402
 import discover_links  # noqa: E402
 import render as render_mod  # noqa: E402
+import render_sources  # noqa: E402
 import verify_links  # noqa: E402
 from render import GLYPH, build_css, esc  # noqa: E402
 from schema import DocumentModel, FragmentCorpus, LinkGraph, WorkspaceManifest  # noqa: E402
@@ -234,24 +235,42 @@ def render_atlas(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict
     )
 
 
-def build_site(manifest: WorkspaceManifest, doc_models: dict, link_graph: LinkGraph | None = None,
-               theme: dict | None = None) -> dict:
-    """Pure: manifest + per-origin DocumentModels (+ optional verified LinkGraph) → {filename: html}.
+def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | None = None,
+               link_graph: LinkGraph | None = None, theme: dict | None = None) -> dict:
+    """Pure: manifest + per-origin DocumentModels (+ corpora, + optional verified LinkGraph) →
+    {filename: html}.
 
-    With a LinkGraph, citation chips drill ACROSS pages (a chip whose locator is an edge source
-    links to the target member's page) and an atlas.html renders the verified graph. Members
+    Drill-to-source (spec 003): every member's cited source files are rendered as bundled,
+    beautified pages under `sources/<origin>/`, and citation chips drill into the OWNING repo's
+    source content across the whole workspace (`build_workspace_source_resolver`). A LinkGraph
+    still adds the verified atlas.html and acts as a cross-repo PAGE-link fallback. Members
     without a DocumentModel are omitted — a half-built portal renders honestly."""
     merged_theme = {**(manifest.theme or {}), **(theme or {})}
+    corpora = corpora or {}
+    rendered = [m for m in manifest.members if doc_models.get(m.origin) is not None]
+
+    # primary: a citation drills to the owning repo's bundled source content (any related repo)
+    src_corpora = {m.origin: corpora[m.origin] for m in rendered if m.origin in corpora}
+    source_resolver = render_sources.build_workspace_source_resolver(src_corpora) if src_corpora else None
+    # fallback: a verified cross-repo edge → the target member's page (atlas navigation)
     src_to_page: dict[str, str] = {}
     if link_graph:
         for e in link_graph.edges:
             src_to_page.setdefault(e.src.locator, _page_filename(e.dst.origin))
-    resolve = (lambda ref: src_to_page.get(ref.locator)) if src_to_page else None
+    page_resolver = (lambda ref: src_to_page.get(ref.locator)) if src_to_page else None
+    resolve = render_sources.compose_resolvers(source_resolver, page_resolver)
+
     site: dict[str, str] = {}
-    for m in manifest.members:
-        dm = doc_models.get(m.origin)
-        if dm is not None:
-            site[_page_filename(m.origin)] = render_mod.render(dm, merged_theme, resolve=resolve)
+    for m in rendered:
+        dm = doc_models[m.origin]
+        site[_page_filename(m.origin)] = render_mod.render(dm, merged_theme, resolve=resolve)
+        corpus = corpora.get(m.origin)
+        if corpus is not None:
+            pages = render_sources.render_source_pages(
+                corpus, merged_theme, back_href="../../" + _page_filename(m.origin),
+                project=dm.title or corpus.project_name)
+            for name, html in pages.items():
+                site[f"sources/{m.origin}/{name}"] = html
     if link_graph is not None:
         site["atlas.html"] = render_atlas(manifest, link_graph, theme)
     site["index.html"] = render_index(manifest, theme, has_atlas=link_graph is not None)
@@ -330,12 +349,16 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return vrc
     active_manifest = manifest.model_copy(update={"members": active})
-    site = build_site(active_manifest, ready, link_graph, theme)
+    site = build_site(active_manifest, ready, corpora, link_graph, theme)
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
     for fn, html_out in site.items():
-        (outdir / fn).write_text(html_out, encoding="utf-8")
-    print(f"synthesize_atlas: ✓ portal written to {outdir} ({len(site)} pages incl. index.html)")
+        dest = outdir / fn
+        dest.parent.mkdir(parents=True, exist_ok=True)   # nested sources/<origin>/ dirs
+        dest.write_text(html_out, encoding="utf-8")
+    n_src = sum(1 for fn in site if fn.startswith("sources/"))
+    print(f"synthesize_atlas: ✓ portal written to {outdir} ({len(site) - n_src} pages + {n_src} source page(s); "
+          "every citation drills into sources/)")
     return 0
 
 
