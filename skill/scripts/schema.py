@@ -427,6 +427,8 @@ class WorkspaceMember(BaseModel):
     title: Optional[str] = Field(None, description="Display title for the index card (defaults to origin).")
     description: Optional[str] = Field(None, description="One-line description for the index card.")
     pin: Optional[str] = Field(None, description="Commit to pin for a reproducible build (recorded; checkout is the operator's job).")
+    url: Optional[str] = Field(None, description="Git URL to fetch this member at `pin` when it isn't checked out locally (Phase F).")
+    optional: bool = Field(default=False, description="If true, skip this member (with a warning) when its source path is missing, instead of failing the build.")
     base_url: Optional[str] = Field(None, description="Optional published host base for 'view source' links (else self-contained).")
 
 

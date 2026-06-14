@@ -52,7 +52,7 @@ skill/templates/storybook.html # visual contract (already present; render.py CSS
 skill/tests/test_render.py     # rewrite — assert new structure
 skill/tests/test_render_coverage.py  # rewrite — coverage pills
 skill/tests/fixtures/document_model.json  # extend — new fields + hub/stack/timeline
-skill/SKILL.md                 # docs — layouts (5→8), compose fields, disclosure model
+skills/speckit-storybook/SKILL.md  # docs — layouts (5→8), compose fields, disclosure model
 DESIGN.md                      # §11.3 resolved decision; §11.4 phase note
 ```
 

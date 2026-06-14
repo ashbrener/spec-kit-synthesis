@@ -281,7 +281,16 @@ def main(argv: list[str] | None = None) -> int:
     ready: dict[str, DocumentModel] = {}
     corpora: dict[str, FragmentCorpus] = {}
     lines: list[str] = []
+    skipped: list[str] = []
     for m in manifest.members:
+        src = Path(base) / m.path
+        if not src.exists():
+            if m.optional:
+                skipped.append(m.origin)
+                lines.append(f"   [-] {m.origin:14} (optional · source not found) — skipped")
+                continue
+            raise SystemExit(f"synthesize_atlas: member {m.origin!r} source not found: {src} "
+                             '(set "optional": true to skip a not-checked-out repo).')
         mw = work / _slug(m.origin)
         mw.mkdir(parents=True, exist_ok=True)
         corpus = build_member_corpus(m, base, mw)
@@ -302,7 +311,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"synthesize_atlas: link_graph.json — {len(link_graph.edges)} cross-repo edge(s) "
           "(declared + shared-identifier; prose edges added by the agent).")
 
-    missing = [m.origin for m in manifest.members if m.origin not in ready]
+    active = [m for m in manifest.members if m.origin not in skipped]
+    missing = [m.origin for m in active if m.origin not in ready]
 
     # ── scaffold path: some member still needs its IR ──────────────────────
     if missing or not args.out:
@@ -313,13 +323,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # ── finish path: fail-closed link gate, then render pages + atlas + index ──
-    corpus_paths = [str(work / _slug(m.origin) / "corpus.json") for m in manifest.members]
+    corpus_paths = [str(work / _slug(m.origin) / "corpus.json") for m in active]
     vrc = verify_links.main([str(work / "link_graph.json"), *corpus_paths])
     if vrc != 0:
         print("synthesize_atlas: LINK VERIFY FAILED (fail-closed) — fix the flagged edges, do not bypass.",
               file=sys.stderr)
         return vrc
-    site = build_site(manifest, ready, link_graph, theme)
+    active_manifest = manifest.model_copy(update={"members": active})
+    site = build_site(active_manifest, ready, link_graph, theme)
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
     for fn, html_out in site.items():

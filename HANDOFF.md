@@ -76,7 +76,7 @@ coverage note (fail-closed). Stateless: every run is a pure function of inputs;
 no persistent product model (that's product-mem's territory — see workstate
 PROJECT-BRIEF §10/§13/§15).
 
-Files: `skill/SKILL.md` (orchestration algorithm), `skill/scripts/`
+Files: `skills/speckit-storybook/SKILL.md` (orchestration algorithm), `skill/scripts/`
 (schema, adapter_speckit, adapter_code, adapter_doc, verify, render,
 theme_detect, synthesize), `skill/tests/` (93 tests), `examples/`,
 `DESIGN.md` (§11 = resolved architecture).
