@@ -36,8 +36,9 @@ import adapter_code
 import adapter_doc
 import adapter_speckit
 import render as render_mod
+import render_sources
 import verify as verify_mod
-from schema import FragmentCorpus
+from schema import DocumentModel, FragmentCorpus
 
 HAND_OFF = """\
 ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("specs_dir", help="Path to the specs/ directory (NNN-* feature folders).")
     p.add_argument("--code", default=None, help="Optional source tree to merge as a CODE source (enables the coverage view).")
     p.add_argument("--docs", default=None, help="Optional free-form design-doc / ADR tree to merge as a DESIGN_DOC source.")
+    p.add_argument("--adr-dir", default=None, help="A repo's ADR directory (e.g. docs/adr); its docs are ingested as kind='adr' (FR-008). Implies a DESIGN_DOC merge even without --docs.")
     p.add_argument("--work", default=".synthesis", help="Working dir for IR artifacts (default: .synthesis).")
     p.add_argument("--project-name", default=None, help="Display name for the synthesis.")
     p.add_argument("--out", default=None, help="Render the storybook here. Requires the agent's IR files to exist.")
@@ -99,12 +101,14 @@ def main(argv: list[str] | None = None) -> int:
         return rc
     merged = FragmentCorpus.model_validate_json(spec_corpus.read_text())
 
-    def _merge_source(adapter, src_dir: str, label: str, out_name: str) -> int:
+    def _merge_source(adapter, src_dir: str, label: str, out_name: str,
+                      extra_args: list[str] | None = None) -> int:
         """Adapt an extra source and merge it into `merged`, collision-checked."""
         nonlocal merged
         out = work / out_name
         rc = adapter.main([src_dir, "--out", str(out)]
-                          + (["--project-name", args.project_name] if args.project_name else []))
+                          + (["--project-name", args.project_name] if args.project_name else [])
+                          + (extra_args or []))
         if rc != 0:
             print(f"synthesize: {label} adapter failed.", file=sys.stderr)
             return rc
@@ -122,8 +126,13 @@ def main(argv: list[str] | None = None) -> int:
         rc = _merge_source(adapter_code, args.code, "code", "corpus-code.json")
         if rc != 0:
             return rc
-    if args.docs:
-        rc = _merge_source(adapter_doc, args.docs, "design-doc", "corpus-docs.json")
+    # A DESIGN_DOC merge runs when --docs and/or --adr-dir is given. With only
+    # --adr-dir, the ADR directory is itself the docs tree (its ADRs are still
+    # ingested as kind='adr' — FR-008).
+    if args.docs or args.adr_dir:
+        docs_dir = args.docs or args.adr_dir
+        extra = ["--adr-dir", args.adr_dir] if args.adr_dir else None
+        rc = _merge_source(adapter_doc, docs_dir, "design-doc", "corpus-docs.json", extra)
         if rc != 0:
             return rc
 
@@ -152,13 +161,22 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return vrc
 
-    out = args.out or "architecture.html"
-    render_argv = [str(doc), "--out", out] + (["--theme", args.theme] if args.theme else [])
-    rrc = render_mod.main(render_argv)
-    if rrc != 0:
-        print("synthesize: render failed.", file=sys.stderr)
-        return rrc
-    print(f"synthesize: ✓ storybook written to {out}")
+    out_path = Path(args.out or "architecture.html")
+    theme_dict = json.loads(Path(args.theme).read_text(encoding="utf-8")) if args.theme else {}
+    doc_model = DocumentModel.model_validate_json(doc.read_text(encoding="utf-8"))
+    corpus_model = FragmentCorpus.model_validate_json(corpus.read_text(encoding="utf-8"))
+
+    # drill-to-source (spec 003): render each cited source file as a bundled, beautified page
+    # under sources/, and wire the storybook's citation chips to open it at the cited section.
+    n_src = render_sources.write_source_views(
+        corpus_model, out_path.parent, theme_dict,
+        back_href="../" + out_path.name,
+        project=doc_model.title or corpus_model.project_name,
+    )
+    resolver = render_sources.build_source_resolver(corpus_model, base="sources/")
+    out_path.write_text(render_mod.render(doc_model, theme_dict, resolve=resolver), encoding="utf-8")
+    print(f"synthesize: ✓ storybook + {n_src} source page(s) written to {out_path} "
+          f"(every citation drills into sources/)")
     return 0
 
 

@@ -114,13 +114,27 @@ def test_render_atlas_empty_graph_is_honest():
 
 
 def test_build_site_with_graph_adds_atlas_resolver_and_index_link():
-    site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")}, _graph())
+    site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")}, link_graph=_graph())
     assert "atlas.html" in site
     assert 'href="atlas.html"' in site["index.html"]          # index links the atlas
-    assert 'href="specs.html"' in site["docs.html"]           # chip drills cross-repo to dst page
+    assert 'href="specs.html"' in site["docs.html"]           # chip drills cross-repo to dst page (no corpora → page fallback)
 
 
 def test_build_site_without_graph_is_unchanged():
     site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")})
     assert "atlas.html" not in site
     assert 'href="atlas.html"' not in site["index.html"]
+
+
+def test_build_site_with_corpora_drills_to_bundled_source():
+    import base64
+    import re
+    docs_corpus = FragmentCorpus(project_name="d", fragments=[
+        Fragment(id="docs::o#x", kind="spec", text="# Heading\n\nReal source content.",
+                 source=SourceRef(type=SourceType.DESIGN_DOC, name="o", locator="docs::o#x"))])
+    site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")},
+                            {"docs": docs_corpus}, link_graph=_graph())
+    assert "sources/docs/o.html" in site                              # bundled source page emitted
+    assert 'href="sources/docs/o.html#x"' in site["docs.html"]        # chip drills to source content (primary over page-link)
+    blob = base64.b64decode(re.search(r'data-md="([^"]*)"', site["sources/docs/o.html"]).group(1)).decode()
+    assert "Real source content." in blob                            # the actual source is copied INTO the html

@@ -126,9 +126,9 @@ def test_non_markdown_ignored(docs_tree: Path):
 def test_feature_key_grouping(docs_tree: Path):
     corpus = adapter_doc.build_corpus(docs_tree, "Demo")
     by_id = {f.id: f for f in corpus.fragments}
-    # nested file groups under its top-level dir
-    assert by_id["adr/0001-use-uv.md#status"].feature_key == "adr"
-    # top-level file groups under its filename stem
+    # an ADR groups under its own id (FR-008), not its containing dir
+    assert by_id["adr/0001-use-uv.md#status"].feature_key == "0001"
+    # a plain (non-ADR) top-level file groups under its filename stem
     assert by_id["architecture.md#components"].feature_key == "architecture"
 
 

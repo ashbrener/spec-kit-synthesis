@@ -171,10 +171,12 @@ it reprints the brief and names what's missing. On finish it runs the fail-close
 **`verify_links.py`** gate (ENDPOINTS_RESOLVE · EVIDENCE_PRESENT ·
 EVIDENCE_GROUNDED) over the link graph and every member corpus. Non-zero ⇒ **stop
 and fix** the flagged edges — never bypass. On pass it renders the portal: each
-member's page (with citation chips that drill ACROSS to the linked member's page
-where an edge exists), the coverage-honest `atlas.html`, and `index.html`. All
-pages share the single editorial design system — there is no second visual
-system.
+member's page, the coverage-honest `atlas.html`, and `index.html`. **Drill-to-source
+(spec 003):** every member's cited spec/ADR files are rendered as bundled, beautified pages
+under `sources/<origin>/`, and every citation chip — same-repo *or cross-repo* — drills into
+the **actual source content of its owning repo** (content copied into the HTML). The atlas
+remains the repo-to-repo navigation map. All pages share the single editorial design system —
+there is no second visual system.
 
 ## What atlas is NOT
 

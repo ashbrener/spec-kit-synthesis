@@ -186,7 +186,10 @@ Produces the self-contained interactive storybook in the editorial design system
 (renderer v2): a warm light-only theme, per-section disclosure (inline "Technical
 detail" — no global depth toggle), a sticky scrollspy TOC, hand-laid interactive
 SVG diagrams that animate per-layout, source-typed citation chips, and a
-References appendix. A `--theme` JSON of CSS-variable tokens reskins everything (theming is
+References appendix. **Drill-to-source (spec 003):** every cited spec/ADR file is also rendered
+as a bundled, beautified page under `sources/`, and each citation chip opens it at the exact
+cited section — the source content is *copied into the HTML*, so the read surface is
+self-contained. A `--theme` JSON of CSS-variable tokens reskins everything (theming is
 cosmetic, downstream of synthesis — it can change how a claim looks, never which
 claims exist). The storybook is **generated, never hand-edited**: to fix a fact,
 fix the source and regenerate.
