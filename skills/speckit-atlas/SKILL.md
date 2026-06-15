@@ -64,9 +64,37 @@ The **epicenter is the manifest's directory**: every member `path` is resolved
 relative to where `synthesis.workspace.json` lives (absolute paths also work). So
 the manifest sits at the workspace root and points outward at sibling repos.
 
+## One command on a governed workspace (auto-scaffold — spec 005)
+
+On a **governed** workspace you do not author a manifest at all. Invoke with **no manifest** and a
+`--from` pointing anywhere inside the workspace (the source repo *or* a build repo); the reader:
+
+1. **discovers the authority** that owns `.spec-arch-domain.yml` — directly if the launch repo owns
+   it, else by following that repo's `.spec-arch-governance.yml` `sources[role=source]` pointer;
+2. **derives an in-memory manifest** from the declared signal — one member per declared domain
+   member; each member's specs ingested structure-aware and its declared `adr_dir` as decision
+   records (a `source` repo is read in a single `doc` pass: docs + specs + ADRs). Build-repo code is
+   left out unless an operator manifest opts in;
+3. **prints a scaffold report** (authority + per-member role/namespace/locator + the `specs_dir`/
+   `adr_dir` read + skipped repos) — reviewable before any reasoning;
+4. **proceeds through the UNCHANGED pipeline** (stage-0 adapt → per-member reasoning → fail-closed
+   `verify_links.py` → render).
+
+```
+uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/synthesize_atlas.py" \
+    --from . --work .synthesis-portal            # then re-run with --out site/ after reasoning
+```
+
+No manifest file is written (the derived manifest is carried in-memory); the reader stays read-only on
+the consumer repos. An **operator overlay** is optional: pass a partial `synthesis.workspace.json`
+alongside `--from` and it overlays presentation (title/description/theme always wins) and may add or
+override members (e.g. enabling a build repo's code). An **ungoverned** workspace (no reachable
+`.spec-arch-domain.yml`) still requires a hand-authored manifest — the reader invents nothing.
+
 ## The workspace manifest
 
-A `synthesis.workspace.{json,toml}` describing the members to federate:
+For an ungoverned workspace (or to override the derived one), author a
+`synthesis.workspace.{json,toml}` describing the members to federate:
 
 ```json
 {

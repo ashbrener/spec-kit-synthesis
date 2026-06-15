@@ -79,8 +79,11 @@ def _is_adr(rel: str, adr_root: Optional[str] = None) -> bool:
     When `adr_root` is set (a caller-declared ADR directory, e.g. a repo's
     `adr_dir`), every doc at or below it is an ADR regardless of filename shape.
     """
-    if adr_root is not None and (rel == adr_root or rel.startswith(adr_root + "/")):
-        return True
+    if adr_root is not None:
+        if adr_root in ("", "."):  # the entire walked root is the ADR dir → every doc is an ADR
+            return True
+        if rel == adr_root or rel.startswith(adr_root + "/"):
+            return True
     parts = rel.split("/")
     if any(part.lower() in _ADR_DIR_PARTS for part in parts[:-1]):
         return True

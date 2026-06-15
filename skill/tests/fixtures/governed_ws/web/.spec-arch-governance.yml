@@ -1,0 +1,8 @@
+version: v1
+role: standalone
+namespace: WEB
+specs_dir: specs
+sources:
+  - id: core
+    locator: ../core
+    role: source

@@ -46,6 +46,7 @@ import discover_links  # noqa: E402
 import gov_config  # noqa: E402
 import render as render_mod  # noqa: E402
 import render_sources  # noqa: E402
+import scaffold  # noqa: E402
 import verify_links  # noqa: E402
 from render import GLYPH, build_css, esc  # noqa: E402
 from schema import (DocumentModel, FragmentCorpus, LinkEvidenceKind, LinkGraph,  # noqa: E402
@@ -166,18 +167,54 @@ def load_manifest(path) -> WorkspaceManifest:
     return WorkspaceManifest.model_validate(data)
 
 
-def build_member_corpus(member, base, work) -> FragmentCorpus:
-    """Adapt one member's source, then origin-stamp it (Phase A `with_origin`) so its
-    locators are globally unique across the workspace — no cross-member collisions."""
-    adapter = _ADAPTERS.get(member.adapter)
+def _adapt_one(adapter_name, src, raw, project, *, adr_dir=None, include=None) -> FragmentCorpus:
+    """Run one adapter over one source path → a (not-yet-origin-stamped) FragmentCorpus."""
+    adapter = _ADAPTERS.get(adapter_name)
     if adapter is None:
-        raise ValueError(f"unknown adapter {member.adapter!r} for member {member.origin!r}")
-    src = (Path(base) / member.path).resolve()
-    raw = Path(work) / f"corpus-{_slug(member.origin)}-raw.json"
-    rc = adapter.main([str(src), "--out", str(raw), "--project-name", member.origin])
+        raise ValueError(f"unknown adapter {adapter_name!r}")
+    argv = [str(src), "--out", str(raw), "--project-name", project]
+    if adr_dir and adapter_name == "doc":
+        argv += ["--adr-dir", str(adr_dir)]
+    if include and adapter_name in ("doc", "code"):
+        argv += ["--include", str(include)]
+    rc = adapter.main(argv)
     if rc != 0:
-        raise RuntimeError(f"{member.adapter} adapter failed for member {member.origin!r} ({src})")
-    corpus = FragmentCorpus.model_validate_json(raw.read_text(encoding="utf-8"))
+        raise RuntimeError(f"{adapter_name} adapter failed over {src}")
+    return FragmentCorpus.model_validate_json(raw.read_text(encoding="utf-8"))
+
+
+def build_member_corpus(member, base, work) -> FragmentCorpus:
+    """Adapt one member's source(s), then origin-stamp the result (Phase A `with_origin`) so its
+    locators are globally unique across the workspace — no cross-member collisions.
+
+    Merged multi-source ingestion (spec 005): when `member.sources` is set, each `IngestionSource`
+    is adapted over its own path and all fragments are MERGED into one corpus before stamping — so a
+    single member can carry, e.g., structure-aware specs (speckit) + decision records (doc). When
+    `sources` is None, the legacy single `adapter`/`path` path is used unchanged."""
+    base = Path(base)
+    work = Path(work)
+    if member.sources:
+        merged: list = []
+        for i, s in enumerate(member.sources):
+            src = (base / s.path).resolve()
+            if not src.exists():
+                continue  # a declared sub-source the repo doesn't actually have — ingest what exists
+            raw = work / f"corpus-{_slug(member.origin)}-{i}-{s.adapter}-raw.json"
+            sub = _adapt_one(s.adapter, src, raw, member.origin, adr_dir=s.adr_dir, include=s.include)
+            merged.extend(sub.fragments)
+        # de-dupe by fragment id (a doc free-form pass and an adr pass may both touch the adr dir)
+        seen: set[str] = set()
+        unique = []
+        for f in merged:
+            if f.id in seen:
+                continue
+            seen.add(f.id)
+            unique.append(f)
+        corpus = FragmentCorpus(project_name=member.origin, fragments=unique)
+        return corpus.with_origin(member.origin)
+    src = (base / member.path).resolve()
+    raw = work / f"corpus-{_slug(member.origin)}-raw.json"
+    corpus = _adapt_one(member.adapter, src, raw, member.origin)
     return corpus.with_origin(member.origin)
 
 
@@ -353,15 +390,50 @@ def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | No
 # ────────────────────────────────── CLI ─────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Build a documentation portal from a workspace manifest (spec 002).")
-    p.add_argument("manifest", help="Path to synthesis.workspace.{json,toml}.")
+    p = argparse.ArgumentParser(description="Build a documentation portal from a workspace manifest (spec 002), "
+                                "or auto-scaffold one from governance contracts on a governed workspace (spec 005).")
+    p.add_argument("manifest", nargs="?", default=None,
+                   help="Path to synthesis.workspace.{json,toml}. Optional on a governed workspace "
+                        "(the manifest is derived); when given, it overlays the derived manifest.")
+    p.add_argument("--from", dest="from_dir", default=".",
+                   help="Where to start authority discovery on a governed workspace (default: cwd).")
+    p.add_argument("--authority", default=None,
+                   help="Authority repo that owns .spec-arch-domain.yml (overrides discovery).")
     p.add_argument("--work", default=".synthesis-portal", help="Working dir for per-member IR (default: .synthesis-portal).")
     p.add_argument("--out", default=None, help="Site output directory. Requires every member's document_model.json.")
     p.add_argument("--theme", default=None, help="Optional theme-token JSON applied to the whole portal.")
     args = p.parse_args(argv)
 
-    manifest = load_manifest(args.manifest)
-    base = Path(args.manifest).resolve().parent
+    # ── resolve the manifest: hand-authored, auto-scaffolded, or overlaid (spec 005) ──
+    operator = load_manifest(args.manifest) if args.manifest else None
+    authority = scaffold.discover_authority(args.authority or args.from_dir)
+    if authority is None and operator is not None:
+        # a hand-authored manifest may sit at the workspace root — try discovery from there too
+        authority = scaffold.discover_authority(Path(args.manifest).resolve().parent)
+
+    derived = None
+    if authority is not None:
+        domain = gov_config.read_domain_manifest(authority)
+        if isinstance(domain, gov_config.ManifestError):
+            print(f"synthesize_atlas: domain manifest invalid ({domain.message}) — not scaffolding; "
+                  "falling back to the hand-authored manifest.", file=sys.stderr)
+            authority = None
+        elif domain is None:
+            authority = None
+        else:
+            derived, report = scaffold.derive_manifest(authority, domain)
+            print(scaffold.format_report(report))
+
+    manifest = scaffold.overlay_manifest(derived, operator)
+    if manifest is None:
+        print("synthesize_atlas: ungoverned workspace and no manifest given — nothing to build. "
+              "Provide a synthesis.workspace.json, or run inside a governed workspace "
+              "(a repo reachable to a .spec-arch-domain.yml).", file=sys.stderr)
+        return 2
+
+    # base anchors member-path resolution + the declared-topology read: the authority dir when
+    # scaffolded (FR-008 — decoupled from any manifest-file location), else the manifest's parent.
+    base = authority if authority is not None else Path(args.manifest).resolve().parent
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
     theme: dict[str, str] = {}

@@ -1,0 +1,14 @@
+version: v1
+members:
+  - name: Core
+    role: source
+    namespace: CORE
+    locator: .
+  - name: Api
+    role: build
+    namespace: API
+    locator: ../api
+  - name: Web
+    role: standalone
+    namespace: WEB
+    locator: ../web
