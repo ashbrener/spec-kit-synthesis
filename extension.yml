@@ -1,0 +1,60 @@
+# =============================================================================
+# spec-kit-synthesis — SpecKit extension manifest
+# =============================================================================
+# The installation contract `specify extension add` reads. The CLI validates this
+# file, copies the repo into the consumer's `.specify/extensions/synthesis/`, and
+# registers the command surface below.
+#
+# What this extension does: synthesize a project's scattered spec-kit specs (+ code
+# + design docs + ADRs) into ONE faithful, interactive, plain-English architecture
+# storybook (one repo) or a whole multi-repo documentation portal with a verified
+# docs↔specs↔code traceability atlas (many repos). The in-session agent is the
+# reasoning engine; deterministic scripts carry parse, the fail-closed verify gate,
+# and render. READ-ONLY on the consumer's sources — it never mutates them.
+#
+# Unlike a lifecycle extension (e.g. arch-governance), synthesis is INVOKED, not
+# hook-driven: it registers no lifecycle hooks. On a governed workspace, the atlas
+# command auto-scaffolds its workspace manifest from the governance contracts —
+# one command, no hand-authored manifest (spec 005).
+# =============================================================================
+
+schema_version: "1.0"
+
+extension:
+  # Lowercase-kebab id; the directory name under `.specify/extensions/`. Command
+  # names below must start with `speckit.synthesis.`.
+  id: "synthesis"
+  name: "spec-kit-synthesis"
+  version: "0.1.0"
+  description: "Synthesize spec-kit specs into faithful, interactive architecture storybooks & doc portals."
+  author: "Ash Brener"
+  repository: "https://github.com/ashbrener/spec-kit-synthesis"
+  license: "MIT"
+  homepage: "https://github.com/ashbrener/spec-kit-synthesis"
+
+requires:
+  # The extension uses only stable SpecKit primitives + its own deterministic
+  # Python scripts (pydantic + pyyaml); no higher floor is forced.
+  speckit_version: ">=0.1.0"
+
+provides:
+
+  # The command surface. `file` is relative to this extension's root and points at
+  # the Markdown body the host agent runs for that command (the skill instructions).
+  commands:
+    # One repo → one faithful, interactive plain-English architecture storybook.
+    - name: "speckit.synthesis.storybook"
+      file: "commands/storybook.md"
+      description: "One repo → one faithful, interactive plain-English architecture storybook (HTML). Every claim drills to its actual rendered source; fail-closed on fabrication."
+
+    # A workspace of repos → a documentation portal + verified traceability atlas.
+    - name: "speckit.synthesis.atlas"
+      file: "commands/atlas.md"
+      description: "A workspace of repos → a documentation portal (a storybook per repo) + a verified docs↔specs↔code traceability atlas. On a governed workspace it auto-scaffolds from the governance contracts: one command, no manifest."
+
+tags:
+  - "documentation"
+  - "architecture"
+  - "storybook"
+  - "traceability"
+  - "synthesis"

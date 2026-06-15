@@ -1,7 +1,6 @@
 ---
-name: speckit-atlas
-description: Synthesize a WORKSPACE of repositories into one interactive documentation portal — a faithful plain-English storybook per repo plus a verified docs↔specs↔code traceability atlas. Use when someone wants the whole-product story across many repos (a docs repo, the spec-kit specs that created it, and the backend/frontend repos that derive the code), drilling backward to specs and forward to code, all hostable as static HTML. NOT a single-repo renderer (that is speckit-storybook), NOT a dashboard.
-user-invocable: true
+name: speckit.synthesis.atlas
+description: Synthesize a WORKSPACE of repositories into one interactive documentation portal — a faithful plain-English storybook per repo plus a verified docs↔specs↔code traceability atlas. Use when someone wants the whole-product story across many repos (a docs repo, the spec-kit specs that created it, and the backend/frontend repos that derive the code), drilling backward to specs and forward to code, all hostable as static HTML. NOT a single-repo renderer (that is the storybook command), NOT a dashboard.
 ---
 
 # speckit-atlas — the documentation portal generator
@@ -40,12 +39,25 @@ architecture not spec history; current-state only; fail-closed on gaps; stateles
 
 ## Toolchain
 
-All scripts run via **`uv`** (never `pip`, never system Python). As an installed
-plugin, the scripts and their `pyproject.toml` live at `${CLAUDE_PLUGIN_ROOT}`, so
-run them against the plugin's own project:
-`uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/synthesize_atlas.py" …`.
-The scripts need only `pydantic`; `uv` builds the venv on first run. (In-repo
-development, drop the `${CLAUDE_PLUGIN_ROOT}` prefix.)
+All scripts run via **`uv`** (never `pip`, never system Python). First locate the
+extension root (`$SYN`), then run every script from there:
+
+```
+# installed as a spec-kit extension (the usual case):
+SYN=.specify/extensions/synthesis
+# …or running inside the synthesis repo itself (development):
+SYN=.
+```
+
+Run scripts with their two deps provided ephemerally — this builds a correct,
+throwaway env and **ignores any stale vendored `.venv`** (a `--dev` install copies
+one whose paths are broken):
+
+```
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" …
+```
+
+(The scripts need only `pydantic` + `pyyaml`.) The examples below use `$SYN`.
 
 ## Two directories, one workspace
 
@@ -81,7 +93,7 @@ On a **governed** workspace you do not author a manifest at all. Invoke with **n
    `verify_links.py` → render).
 
 ```
-uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/synthesize_atlas.py" \
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
     --from . --work .synthesis-portal            # then re-run with --out site/ after reasoning
 ```
 
@@ -144,7 +156,7 @@ manifest ─[stage 0 adapt: code]→ per-member origin-stamped corpus.json + loc
 ### Stage 0 — Adapt (deterministic; you just run it)
 
 ```
-uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/synthesize_atlas.py" \
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
     synthesis.workspace.json --work .synthesis-portal
 ```
 
@@ -219,7 +231,7 @@ exactly the same output as before — these are purely additive reads.
 Re-run the same command **with `--out`**:
 
 ```
-uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/synthesize_atlas.py" \
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
     synthesis.workspace.json --work .synthesis-portal --out site/ [--theme theme.json]
 ```
 
