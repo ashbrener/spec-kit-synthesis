@@ -82,3 +82,25 @@ def test_rejects_manifest_missing_members(tmp_path):
     res = gc.read_domain_manifest(tmp_path)
     assert isinstance(res, gc.ManifestError)
     assert "members" in res.message
+
+
+# ── sources pointer (spec 005 — RepoConfig.sources) ──────────────────────────
+
+GOVERNED_WS = Path(__file__).parent / "fixtures" / "governed_ws"
+
+
+def test_repo_config_parses_sources():
+    cfg = gc.read_repo_config(GOVERNED_WS / "api")
+    assert cfg is not None
+    assert cfg.namespace == "API"
+    assert len(cfg.sources) == 1
+    src = cfg.sources[0]
+    assert src.locator == "../core"
+    assert src.role == "source"
+    assert src.id == "core"
+
+
+def test_repo_config_absent_sources_is_empty():
+    cfg = gc.read_repo_config(GOVERNED_WS / "core")
+    assert cfg is not None
+    assert cfg.sources == []

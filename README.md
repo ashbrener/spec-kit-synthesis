@@ -140,6 +140,15 @@ uv run python skill/scripts/synthesize_atlas.py synthesis.workspace.json \
 
 The result in `site/` is self-contained — `index.html` (book-of-books), one page per repo, and `atlas.html` (the verified graph). Host it on Netlify/Vercel or open `index.html` directly; no checkout, no auth, no server. Repos that aren't checked out can be marked `"optional": true` (skipped with a warning, coverage-honest) or carry a `url`+`pin` to be fetched. Cross-repo links are **fail-closed**: an edge ships only with real evidence (declared in the manifest, a shared qualified identifier, or a literal prose quote), gated by `verify_links.py`. See [`skills/speckit-atlas/SKILL.md`](skills/speckit-atlas/SKILL.md) for the manifest format and the full algorithm.
 
+**On a governed workspace, you don't write a manifest at all.** Invoke with no manifest and a `--from` pointing anywhere inside the workspace (the source repo *or* a build repo); synthesis discovers the authority that owns `.spec-arch-domain.yml` (following a build repo's `sources` pointer when needed), derives the manifest in-memory from the declared signal — one member per declared member, specs read structure-aware and the declared `adr_dir` as decisions — prints a reviewable scaffold report, then runs the unchanged pipeline:
+
+```
+# governed: one command, no manifest (CORE/API/WEB workspace)
+uv run python skill/scripts/synthesize_atlas.py --from . --work .synthesis-portal   # then re-run with --out site/
+```
+
+No manifest file is written (it's carried in-memory; the reader stays read-only on consumer repos). A partial `synthesis.workspace.json` passed alongside overlays presentation and may add/override members (e.g. enabling a build repo's code). An ungoverned workspace still needs a hand-authored manifest — nothing is invented.
+
 **Governed projects get a richer read (ungoverned projects are unchanged).** When a project adopts the architecture-governance convention, atlas conforms to its published contracts *as a documented format* — no runtime dependency, read-only on the consumer repos. It renders **typed citations** matching the shared vocabulary (`cites` for a plan→decision, `implements` for code→spec, `derived_from` for spec→spec, `references` as the untyped fallback), reads **bare `ADR-NNN`** decisions under each repo's configured namespace (`<namespace>-ADR-NNN`, no file renames; bare ids stay repo-local), trusts a declared **`.spec-arch-domain.yml`** as the source-of-truth topology (members/roles/namespaces/locators, graded `declared`) with `synthesis.workspace.json` as the presentation overlay + fallback, and grades every cross-repo fact by **evidence tier** (`declared` > `identifier` > `prose`). The vendored contracts under `skill/scripts/vendor/` are drift-guarded in CI. A project that declares none of this produces byte-identical output to before.
 
 ## The hard-and-fast rule: faithful, or it doesn't ship

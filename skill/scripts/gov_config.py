@@ -36,6 +36,19 @@ DOMAIN_MANIFEST_FILENAME = ".spec-arch-domain.yml"
 
 # ───────────────────────────── read models ─────────────────────────────────
 
+class RepoSource(BaseModel):
+    """A pointer from a (build) repo to one of its sources (`.spec-arch-governance.yml` `sources[]`).
+
+    The reader follows a `role: source` entry's `locator` to discover the authority repo that owns
+    the domain manifest (spec 005)."""
+
+    model_config = {"extra": "ignore"}
+
+    id: Optional[str] = None
+    locator: str
+    role: Optional[str] = None
+
+
 class RepoConfig(BaseModel):
     """A governed repo's per-repo config (`.spec-arch-governance.yml`)."""
 
@@ -44,6 +57,7 @@ class RepoConfig(BaseModel):
     namespace: Optional[str] = None
     adr_dir: Optional[str] = None
     specs_dir: Optional[str] = None
+    sources: list[RepoSource] = []
 
 
 class DomainMember(BaseModel):
@@ -201,6 +215,7 @@ __all__ = [
     "GOV_CONFIG_FILENAME",
     "DOMAIN_MANIFEST_FILENAME",
     "RepoConfig",
+    "RepoSource",
     "DomainMember",
     "DomainManifest",
     "ManifestError",

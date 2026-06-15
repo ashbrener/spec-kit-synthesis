@@ -416,6 +416,22 @@ class DeclaredLink(BaseModel):
     rel: LinkRel = LinkRel.REFERENCES
 
 
+class IngestionSource(BaseModel):
+    """One source of fragments contributing to a single member's merged corpus (spec 005).
+
+    A governed member is derived with several of these — e.g. its specs (speckit) and its
+    decision records (doc, with `adr_dir` set) — all merged under one member `origin`. When a
+    member declares no `sources`, ingestion falls back to its single `adapter`/`path`.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    adapter: Literal["speckit", "code", "doc"]
+    path: str = Field(..., description="Source path, relative to the workspace base (or absolute).")
+    adr_dir: Optional[str] = Field(None, description="For the doc adapter: force ADR classification at/below this dir.")
+    include: Optional[str] = Field(None, description="Optional extension override passed to the doc/code adapter.")
+
+
 class WorkspaceMember(BaseModel):
     """One repo/source federated into a portal workspace (spec 002).
 
@@ -435,6 +451,17 @@ class WorkspaceMember(BaseModel):
     url: Optional[str] = Field(None, description="Git URL to fetch this member at `pin` when it isn't checked out locally (Phase F).")
     optional: bool = Field(default=False, description="If true, skip this member (with a warning) when its source path is missing, instead of failing the build.")
     base_url: Optional[str] = Field(None, description="Optional published host base for 'view source' links (else self-contained).")
+    sources: Optional[list["IngestionSource"]] = Field(
+        default=None,
+        description="Merged multi-source ingestion (spec 005): when set, each source is adapted and "
+        "merged into one origin-stamped corpus, overriding the single `adapter`/`path`. Empty → None.")
+
+    @model_validator(mode="after")
+    def _empty_sources_is_none(self) -> "WorkspaceMember":
+        # A member can never ingest nothing; an empty list means "use the single-adapter path".
+        if self.sources is not None and len(self.sources) == 0:
+            object.__setattr__(self, "sources", None)
+        return self
 
 
 class WorkspaceManifest(BaseModel):
@@ -480,6 +507,6 @@ __all__ = [
     "BlockType", "CalloutKind",
     "DiagramNode", "DiagramEdge", "DiagramGraph",
     "Block", "Section", "MetaPair", "DocumentModel",
-    "WorkspaceMember", "WorkspaceManifest",
+    "IngestionSource", "WorkspaceMember", "WorkspaceManifest",
     "LinkRel", "LinkEvidenceKind", "LinkEndpoint", "DeclaredLink", "LinkEdge", "LinkGraph",
 ]
