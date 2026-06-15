@@ -23,5 +23,8 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
+      - name: Contract drift guard (spec 004 FR-007)
+        run: uv run pytest skill/tests/test_contract_conformance.py -q
+
       - name: Run tests
         run: uv run pytest skill/tests -q

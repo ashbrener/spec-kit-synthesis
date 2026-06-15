@@ -34,6 +34,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 # scripts dir is importable both as a module and as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -42,17 +43,89 @@ import adapter_code  # noqa: E402
 import adapter_doc  # noqa: E402
 import adapter_speckit  # noqa: E402
 import discover_links  # noqa: E402
+import gov_config  # noqa: E402
 import render as render_mod  # noqa: E402
 import render_sources  # noqa: E402
 import verify_links  # noqa: E402
 from render import GLYPH, build_css, esc  # noqa: E402
-from schema import DocumentModel, FragmentCorpus, LinkGraph, WorkspaceManifest  # noqa: E402
+from schema import (DocumentModel, FragmentCorpus, LinkEvidenceKind, LinkGraph,  # noqa: E402
+                    WorkspaceManifest)
+
+from pydantic import BaseModel  # noqa: E402
 
 _ADAPTERS = {
     "speckit": adapter_speckit,
     "code": adapter_code,
     "doc": adapter_doc,
 }
+
+
+# ───────────────────── topology resolution (spec 004 US2) ────────────────────
+# When a project publishes a `.spec-arch-domain.yml`, it is the SOURCE OF TRUTH for structural
+# topology (members / roles / namespaces / locators), graded `declared`. The workspace record
+# (synthesis.workspace.json) supplies PRESENTATION (title/description/theme/order) always, and
+# the full topology FALLBACK when no manifest is present. On overlap the manifest wins on
+# structural fields; the manifest carries no presentation. An ungoverned project (no manifest)
+# resolves to exactly its workspace record — unchanged behaviour.
+
+class ResolvedMember(BaseModel):
+    """One member of the resolved topology: structure (manifest-or-fallback) + presentation."""
+
+    model_config = {"extra": "forbid"}
+
+    origin: str
+    # structural (manifest if present, else the workspace record):
+    domain_role: Optional[str] = None      # source | build | standalone (manifest role), if declared
+    namespace: Optional[str] = None        # the ADR prefix, if declared
+    locator: Optional[str] = None          # where the member lives, if declared
+    structure_evidence: str = "record"     # "declared" when from the manifest, else "record"
+    # presentation (always from the workspace record):
+    role: str = "spec"                     # the badge role (docs|spec|code|intent)
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+class ResolvedTopology(BaseModel):
+    """The resolved member topology + whether a declared manifest backed it."""
+
+    model_config = {"extra": "forbid"}
+
+    members: list[ResolvedMember]
+    declared: bool = False
+
+
+def resolve_topology(manifest: WorkspaceManifest, domain_manifest=None) -> ResolvedTopology:
+    """Combine the workspace record (presentation + fallback) with an optional declared
+    `.spec-arch-domain.yml` (structural source of truth). Pure + deterministic.
+
+    Matching: a domain member is bound to a workspace member when their identifiers agree
+    (`name`/`namespace`/`locator-stem` vs `origin`, case-insensitive). The workspace member
+    order is preserved (presentation owns ordering)."""
+    dmembers = list(domain_manifest.members) if domain_manifest is not None else []
+
+    def _match(origin: str):
+        o = origin.lower()
+        for dm in dmembers:
+            stem = Path(dm.locator).name.lower() if dm.locator else ""
+            if o in {dm.name.lower(), dm.namespace.lower(), stem}:
+                return dm
+        return None
+
+    resolved: list[ResolvedMember] = []
+    for m in manifest.members:
+        dm = _match(m.origin)
+        if dm is not None:
+            resolved.append(ResolvedMember(
+                origin=m.origin,
+                domain_role=dm.role, namespace=dm.namespace, locator=dm.locator,
+                structure_evidence=LinkEvidenceKind.DECLARED.value,
+                role=m.role, title=m.title, description=m.description))
+        else:
+            resolved.append(ResolvedMember(
+                origin=m.origin,
+                structure_evidence="record",
+                role=m.role, title=m.title, description=m.description))
+    return ResolvedTopology(members=resolved, declared=bool(dmembers))
 
 ATLAS_HAND_OFF = """\
 ─────────────────────────────────────────────────────────────────────────────
@@ -323,9 +396,42 @@ def main(argv: list[str] | None = None) -> int:
             ready[m.origin] = DocumentModel.model_validate_json(dmp.read_text(encoding="utf-8"))
         lines.append(f"   [{ '✓' if have else ' ' }] {m.origin:14} ({m.role:5} · {len(corpus.fragments)} fragments) → {mw}")
 
-    # cross-repo traceability graph (declared + deterministic shared-identifier edges); the
-    # in-session agent may add evidence-gated prose edges before the finish step (spec 002 Phase D).
-    link_graph = discover_links.build_link_graph(manifest, corpora)
+    # Declared topology (spec 004 US2): when the workspace base publishes a `.spec-arch-domain.yml`
+    # it is the structural source of truth (members/roles/namespaces/locators), validated against
+    # the vendored schema and graded `declared`; a malformed manifest is reported and we fall back
+    # to the workspace record. The workspace record is always the presentation overlay + the
+    # topology fallback. An ungoverned project has no manifest → resolves to its record unchanged.
+    domain = gov_config.read_domain_manifest(base)
+    if isinstance(domain, gov_config.ManifestError):
+        print(f"synthesize_atlas: declared topology invalid ({domain.message}) — falling back "
+              "to the workspace record.", file=sys.stderr)
+        domain = None
+    topology = resolve_topology(manifest, domain)
+    (work / "topology.json").write_text(topology.model_dump_json(indent=2), encoding="utf-8")
+    if topology.declared:
+        n_dec = sum(1 for rm in topology.members if rm.structure_evidence == "declared")
+        print(f"synthesize_atlas: declared topology from .spec-arch-domain.yml — "
+              f"{n_dec} member(s) graded `declared` (structural source of truth).")
+
+    # Per-member ADR namespace (spec 004) — used to qualify bare ADR-NNN ids for citation
+    # discovery. The DECLARED manifest namespace wins on this structural field; otherwise the
+    # repo's own `.spec-arch-governance.yml` (searched from the member source path up to the
+    # workspace base) supplies it. Absent → member read as ungoverned (bare ids stay repo-local;
+    # no behaviour change for an ungoverned project).
+    declared_ns = {rm.origin: rm.namespace for rm in topology.members if rm.structure_evidence == "declared"}
+    namespaces: dict[str, str | None] = {}
+    for m in manifest.members:
+        if m.origin in skipped:
+            continue
+        if declared_ns.get(m.origin):
+            namespaces[m.origin] = declared_ns[m.origin]
+            continue
+        cfg = gov_config.find_repo_config((Path(base) / m.path), ceiling=base)
+        namespaces[m.origin] = cfg.namespace if cfg else None
+
+    # cross-repo traceability graph (declared + deterministic shared-identifier + cites edges);
+    # the in-session agent may add evidence-gated prose edges before the finish step (spec 002 Phase D).
+    link_graph = discover_links.build_link_graph(manifest, corpora, namespaces=namespaces)
     (work / "link_graph.json").write_text(link_graph.model_dump_json(indent=2), encoding="utf-8")
     print(f"synthesize_atlas: link_graph.json — {len(link_graph.edges)} cross-repo edge(s) "
           "(declared + shared-identifier; prose edges added by the agent).")

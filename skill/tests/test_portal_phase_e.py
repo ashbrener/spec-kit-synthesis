@@ -49,7 +49,7 @@ def test_empty_evidence_fails():
 
 
 def test_declared_is_trusted_when_endpoints_resolve():
-    g = LinkGraph(edges=[_edge("docs", "docs::o#x", "specs", "specs::s#y", LinkRel.SPECIFIED_BY,
+    g = LinkGraph(edges=[_edge("docs", "docs::o#x", "specs", "specs::s#y", LinkRel.REFERENCES,
                                LinkEvidenceKind.DECLARED, "manifest")])
     assert vl.verify_links(g, {"docs::o#x": "anything", "specs::s#y": "anything"}) == []
 
@@ -96,7 +96,7 @@ def _manifest():
 
 
 def _graph():
-    return LinkGraph(edges=[_edge("docs", "docs::o#x", "specs", "specs::s#y", LinkRel.SPECIFIED_BY,
+    return LinkGraph(edges=[_edge("docs", "docs::o#x", "specs", "specs::s#y", LinkRel.REFERENCES,
                                   LinkEvidenceKind.IDENTIFIER, "FR-007")])
 
 
@@ -104,7 +104,7 @@ def test_render_atlas_links_members_and_is_coverage_honest():
     html = atlas.render_atlas(_manifest(), _graph())
     assert html.startswith("<!DOCTYPE html>")
     assert 'href="docs.html"' in html and 'href="specs.html"' in html
-    assert "specified_by" in html and "FR-007" in html
+    assert "references" in html and "FR-007" in html
     assert "partial" in html                                  # docs+spec but no code → honest caveat
     assert atlas.render_atlas(_manifest(), _graph()) == html  # deterministic
 

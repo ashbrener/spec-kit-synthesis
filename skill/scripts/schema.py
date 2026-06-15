@@ -373,13 +373,18 @@ class DocumentModel(BaseModel):
 # ───────────────────────── workspace (portal — spec 002) ───────────────────
 
 class LinkRel(str, Enum):
-    """The typed, directional relationship a cross-repo edge asserts (spec 002)."""
+    """The typed, directional relationship a cross-repo edge asserts.
 
-    DERIVES_FROM = "derives_from"      # docs/spec derives from upstream intent
-    SPECIFIED_BY = "specified_by"      # a docs claim is specified by a spec
+    Reconciled to the shared governance vocabulary (vocabulary.json @0.2.0, spec 004): the
+    values here MUST equal the contract's `relations` keys (drift-guarded by
+    test_contract_conformance.py). The docs↔spec edge has no typed relation in the contract,
+    so it maps to the untyped `references` fallback rather than a local dialect."""
+
+    DERIVED_FROM = "derived_from"      # a spec is derived from an upstream spec
+    CITES = "cites"                    # a spec/plan cites (is bound by) a decision
     IMPLEMENTS = "implements"          # code implements a spec
-    SUPERSEDES = "supersedes"          # one source supersedes another
-    REFERENCES = "references"          # a plain cross-reference
+    SUPERSEDES = "supersedes"          # one decision supersedes an earlier one
+    REFERENCES = "references"          # untyped fallback (incl. docs↔spec)
 
 
 class LinkEvidenceKind(str, Enum):

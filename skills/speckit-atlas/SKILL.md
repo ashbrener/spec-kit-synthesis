@@ -83,7 +83,7 @@ A `synthesis.workspace.{json,toml}` describing the members to federate:
   ],
   "links": [
     { "src_origin": "docs", "src_locator": "<frag-id>", "dst_origin": "specs",
-      "dst_locator": "<frag-id>", "rel": "specified_by" }
+      "dst_locator": "<frag-id>", "rel": "references" }
   ]
 }
 ```
@@ -148,14 +148,43 @@ this parallelizes cleanly.
 ### Discover cross-repo links (deterministic + YOUR reasoning)
 
 `synthesize_atlas.py` already emitted the **declared** edges (from the manifest,
-trusted) and the **shared-qualified-identifier** edges (deterministic — the same
-`FR-NNN` / feature slug appearing in two members) into `link_graph.json`. You may
-add **prose** edges: a literal cross-reference found in one member's fragment
-naming another (the §5.4 evidence ladder's agent seam). Each prose edge needs a
-typed `rel` (`derives_from`/`specified_by`/`implements`/`supersedes`/`references`),
-both endpoints as origin-namespaced locators, `evidence_kind: "prose"`, and the
-literal quote as `evidence`. Add only what the text actually supports — the gate
-checks grounding, and an unsupported link is worse than a missing one.
+trusted), the **shared-qualified-identifier** edges (deterministic — the same
+`FR-NNN` / feature slug appearing in two members), and **`cites`** edges (a
+spec/plan fragment and an ADR fragment sharing a qualified `<NS>-ADR-NNN`) into
+`link_graph.json`. You may add **prose** edges: a literal cross-reference found in
+one member's fragment naming another (the §5.4 evidence ladder's agent seam). Each
+prose edge needs a typed `rel` — the relation set is the shared governance
+vocabulary: `derived_from` (spec→spec) · `cites` (spec/plan→adr) · `implements`
+(code→spec) · `supersedes` (adr→adr) · `references` (untyped fallback, incl.
+docs↔spec) — both endpoints as origin-namespaced locators, `evidence_kind:
+"prose"`, and the literal quote as `evidence`. Add only what the text actually
+supports — the gate checks grounding, and an unsupported link is worse than a
+missing one.
+
+### Reading a governed project (an enhancement; ungoverned is unchanged)
+
+When a project adopts the architecture-governance convention, atlas reads its
+published contracts **as a documented format** — no runtime dependency on the
+extension, read-only on the consumer repos:
+
+- **Typed citations** — a plan that cites a decision renders as a typed `cites`
+  edge; code→spec as `implements`; spec→spec as `derived_from` (the shared
+  vocabulary, vendored + drift-guarded under `skill/scripts/vendor/`).
+- **Bare `ADR-NNN`** — an unprefixed decision id is read under its repo's
+  configured namespace (from `.spec-arch-governance.yml`) as `<namespace>-ADR-NNN`,
+  with **no file renames**. A bare id stays repo-local; only the fully-qualified
+  form resolves across a repo boundary.
+- **Declared topology** — when the workspace root publishes a `.spec-arch-domain.yml`
+  (validated against the vendored schema), it is the **source of truth** for
+  structural topology (members/roles/namespaces/locators), graded `declared`. The
+  `synthesis.workspace.json` supplies presentation always and is the topology
+  fallback when no manifest is present; the manifest wins on overlapping structural
+  fields.
+- **Evidence tiers** — every cross-repo fact is graded `declared` (manifest/config)
+  > `identifier` (shared qualified id) > `prose` (text), surfaced on the atlas.
+
+An **ungoverned** project (no `.spec-arch-domain.yml`, no per-repo config) produces
+exactly the same output as before — these are purely additive reads.
 
 ### Verify + finish (deterministic gate, then render)
 
