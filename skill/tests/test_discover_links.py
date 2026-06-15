@@ -18,6 +18,13 @@ def _corpus(origin, frags):
     return FragmentCorpus(project_name=origin, fragments=fl).with_origin(origin)
 
 
+def _kinded_corpus(origin, frags):
+    """frags: list of (locator, kind, text). Origin-stamped corpus with per-fragment kinds."""
+    fl = [Fragment(id=loc, source=SourceRef(type=SourceType.SPEC, name=loc, locator=loc), kind=kind, text=txt)
+          for loc, kind, txt in frags]
+    return FragmentCorpus(project_name=origin, fragments=fl).with_origin(origin)
+
+
 def _manifest(members, links=None):
     return WorkspaceManifest(
         members=[WorkspaceMember(origin=o, path=o, adapter="speckit", role=r) for o, r in members],
@@ -45,13 +52,23 @@ def test_identifier_edge_code_implements_spec():
     assert e.dst.origin == "specs" and e.dst.locator.startswith("specs::")
 
 
-def test_docs_specified_by_spec():
+def test_docs_spec_maps_to_references():
+    # the contract has no typed docs↔spec relation → untyped `references` fallback (spec 004)
     docs = _corpus("guide", [("g.md#x", "This behaviour is required by FR-007.")])
     specs = _corpus("specs", [("s.md#fr7", "FR-007 — the rule.")])
     m = _manifest([("guide", "docs"), ("specs", "spec")])
     edges = dl.discover_identifier_edges(m, {"guide": docs, "specs": specs})
-    assert len(edges) == 1 and edges[0].rel is LinkRel.SPECIFIED_BY
-    assert edges[0].src.origin == "guide" and edges[0].dst.origin == "specs"
+    assert len(edges) == 1 and edges[0].rel is LinkRel.REFERENCES
+    # stable, origin-sorted direction (no upstream/downstream inferable from a shared id)
+    assert {edges[0].src.origin, edges[0].dst.origin} == {"guide", "specs"}
+
+
+def test_spec_spec_maps_to_derived_from():
+    a = _corpus("specs-a", [("a.md#fr", "FR-009 — the rule.")])
+    b = _corpus("specs-b", [("b.md#fr", "FR-009 referenced here.")])
+    m = _manifest([("specs-a", "spec"), ("specs-b", "spec")])
+    edges = dl.discover_identifier_edges(m, {"specs-a": a, "specs-b": b})
+    assert len(edges) == 1 and edges[0].rel is LinkRel.DERIVED_FROM
 
 
 def test_no_edge_when_identifier_not_shared():
@@ -64,7 +81,7 @@ def test_no_edge_when_identifier_not_shared():
 def test_declared_edges_are_namespaced_and_trusted():
     m = _manifest([("docs", "docs"), ("specs", "spec")],
                   links=[DeclaredLink(src_origin="docs", src_locator="overview.md#x",
-                                      dst_origin="specs", dst_locator="spec.md#y", rel=LinkRel.SPECIFIED_BY)])
+                                      dst_origin="specs", dst_locator="spec.md#y", rel=LinkRel.REFERENCES)])
     edges = dl.declared_edges(m)
     assert len(edges) == 1 and edges[0].evidence_kind is LinkEvidenceKind.DECLARED
     assert edges[0].src.locator == "docs::overview.md#x" and edges[0].dst.locator == "specs::spec.md#y"
@@ -83,3 +100,72 @@ def test_build_link_graph_merges_dedups_and_is_deterministic():
     assert g1.edges[0].evidence_kind is LinkEvidenceKind.DECLARED
     g2 = dl.build_link_graph(m, {"specs": specs, "be": code})
     assert g1.model_dump_json() == g2.model_dump_json()       # deterministic
+
+
+# ── cites edges (spec 004 US1) ───────────────────────────────────────────────
+
+def test_cites_edge_plan_to_decision_qualified():
+    # a plan (citing kind) cites a qualified decision id held by an adr fragment in another repo
+    plan = _kinded_corpus("api", [("plan.md#s", "plan", "Bound by CORE-ADR-001.")])
+    core = _kinded_corpus("core", [("adr.md#dec", "adr", "# CORE-ADR-001\nThe write path.")])
+    m = _manifest([("api", "spec"), ("core", "spec")])
+    edges = dl.discover_adr_edges(m, {"api": plan, "core": core})
+    assert len(edges) == 1
+    e = edges[0]
+    assert e.rel is LinkRel.CITES and e.evidence == "CORE-ADR-001"
+    assert e.src.origin == "api" and e.dst.origin == "core"     # plan cites the decision
+    assert e.evidence_kind is LinkEvidenceKind.IDENTIFIER
+
+
+def test_cites_edge_bare_id_qualified_to_namespace():
+    # CORE holds a BARE ADR-001; API's plan cites the QUALIFIED CORE-ADR-001 → they resolve
+    core = _kinded_corpus("core", [("adr.md#dec", "adr", "# ADR-001\nThe write path.")])
+    api = _kinded_corpus("api", [("plan.md#s", "plan", "Bound by CORE-ADR-001.")])
+    m = _manifest([("core", "spec"), ("api", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": core, "api": api},
+                                  namespaces={"core": "CORE", "api": "API"})
+    assert len(edges) == 1 and edges[0].rel is LinkRel.CITES
+    assert edges[0].evidence == "CORE-ADR-001"
+    assert edges[0].dst.origin == "core" and edges[0].src.origin == "api"
+
+
+def test_bare_id_is_repo_local_no_cross_match():
+    # two repos each hold a BARE ADR-001 + a plan citing a bare ADR-001; with distinct
+    # namespaces they qualify to CORE-ADR-001 / API-ADR-001 and must NOT cross-match.
+    core = _kinded_corpus("core", [("adr.md#d", "adr", "# ADR-001"), ("plan.md#s", "plan", "see ADR-001")])
+    api = _kinded_corpus("api", [("adr.md#d", "adr", "# ADR-001"), ("plan.md#s", "plan", "see ADR-001")])
+    m = _manifest([("core", "spec"), ("api", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": core, "api": api},
+                                  namespaces={"core": "CORE", "api": "API"})
+    # only intra-repo cites (plan→adr within each repo); never core↔api
+    pairs = {(e.src.origin, e.dst.origin) for e in edges}
+    assert pairs == {("core", "core"), ("api", "api")}
+    assert all(e.evidence in {"CORE-ADR-001", "API-ADR-001"} for e in edges)
+
+
+def test_qualified_id_resolves_cross_repo():
+    # the QUALIFIED form is cross-repo-resolvable: API's plan cites CORE-ADR-001 → edge to core
+    core = _kinded_corpus("core", [("adr.md#d", "adr", "# CORE-ADR-001")])
+    api = _kinded_corpus("api", [("plan.md#s", "plan", "Bound by CORE-ADR-001.")])
+    m = _manifest([("core", "spec"), ("api", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": core, "api": api},
+                                  namespaces={"core": "CORE", "api": "API"})
+    assert len(edges) == 1
+    assert (edges[0].src.origin, edges[0].dst.origin) == ("api", "core")
+
+
+def test_bare_id_without_namespace_mints_no_cross_repo_edge():
+    # a repo with no configured namespace: its bare ADR-001 stays repo-local, unqualifiable
+    core = _kinded_corpus("core", [("adr.md#d", "adr", "# ADR-001")])
+    api = _kinded_corpus("api", [("plan.md#s", "plan", "see ADR-001")])
+    m = _manifest([("core", "spec"), ("api", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": core, "api": api}, namespaces={})
+    assert edges == []                                            # nothing qualifies, no edge
+
+
+def test_generic_doc_mentioning_adr_id_mints_no_cite():
+    # a non-citing kind (design-doc) mentioning an ADR id never mints a citation
+    doc = _kinded_corpus("guide", [("g.md#x", "design-doc", "We follow CORE-ADR-001 broadly.")])
+    core = _kinded_corpus("core", [("adr.md#d", "adr", "# CORE-ADR-001")])
+    m = _manifest([("guide", "docs"), ("core", "spec")])
+    assert dl.discover_adr_edges(m, {"guide": doc, "core": core}) == []

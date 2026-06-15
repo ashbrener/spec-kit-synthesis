@@ -34,6 +34,18 @@ from schema import (
 # or "database" can never mint a spurious edge (the top risk named in the spec).
 _QUALIFIED_ID = re.compile(r"\b(?:(?:FR|SC|NFR|US)-\d+|\d{3}-[a-z][a-z0-9]*(?:-[a-z0-9]+)+)\b")
 
+# ADR identifiers (governance vocabulary @0.2.0). A *qualified* id (<NS>-ADR-NNN) is
+# cross-repo-resolvable as written; a *bare* id (ADR-NNN) is repo-local and is qualified at
+# read time with the owning repo's configured namespace (spec 004 US3). The two patterns are
+# disjoint by construction; we scan for both and normalise bare → qualified per origin.
+_ADR_QUALIFIED = re.compile(r"\b([A-Z][A-Z0-9]*-ADR-\d{3,})\b")
+_ADR_BARE = re.compile(r"\b(ADR-\d{3,})\b")
+
+# Fragment kinds that may CITE a decision (subject of `cites` in the contract) and the kind
+# that IS a decision (object). Kept narrow so a generic doc never mints a citation.
+_CITING_KINDS = {"spec", "plan"}
+_ADR_KIND = "adr"
+
 
 def extract_identifiers(corpus: FragmentCorpus) -> dict[str, set[str]]:
     """Map each qualified identifier → the set of fragment locators that mention it."""
@@ -50,19 +62,21 @@ def _ep(origin: str, locator: str) -> LinkEndpoint:
 
 def _typed_edge(a: tuple[str, str, str], b: tuple[str, str, str]) -> tuple[LinkEndpoint, LinkEndpoint, LinkRel]:
     """Direction + rel for a shared identifier between two members, inferred from their roles.
-    Inputs a, b are (origin, locator, role)."""
+    Inputs a, b are (origin, locator, role).
+
+    Mapping reconciled to the governance vocabulary (spec 004): code↔spec → `implements`;
+    spec↔spec → `derived_from`; docs↔spec → `references` (the contract has no typed docs↔spec
+    relation); anything else → the untyped `references` fallback. (Citation edges, code↔adr,
+    are discovered separately as `cites` — see discover_adr_edges.)"""
     ra, rb = a[2], b[2]
     roles = {ra, rb}
     if roles == {"code", "spec"}:
         code, spec = (a, b) if ra == "code" else (b, a)
         return _ep(code[0], code[1]), _ep(spec[0], spec[1]), LinkRel.IMPLEMENTS
-    if roles == {"docs", "spec"}:
-        docs, spec = (a, b) if ra == "docs" else (b, a)
-        return _ep(docs[0], docs[1]), _ep(spec[0], spec[1]), LinkRel.SPECIFIED_BY
-    if "intent" in roles and roles != {"intent"}:
-        other, intent = (a, b) if ra != "intent" else (b, a)
-        return _ep(other[0], other[1]), _ep(intent[0], intent[1]), LinkRel.DERIVES_FROM
-    lo, hi = sorted([a, b], key=lambda x: x[0])  # stable order for a plain reference
+    if roles == {"spec"}:
+        lo, hi = sorted([a, b], key=lambda x: x[0])
+        return _ep(lo[0], lo[1]), _ep(hi[0], hi[1]), LinkRel.DERIVED_FROM
+    lo, hi = sorted([a, b], key=lambda x: x[0])  # stable order for a plain reference (incl. docs↔spec)
     return _ep(lo[0], lo[1]), _ep(hi[0], hi[1]), LinkRel.REFERENCES
 
 
@@ -93,6 +107,82 @@ def discover_identifier_edges(manifest: WorkspaceManifest, corpora: dict[str, Fr
     return edges
 
 
+def qualify_adr(token: str, namespace: str | None) -> str | None:
+    """Normalise an ADR reference to its cross-repo-resolvable, qualified form, or None.
+
+    A qualified `<NS>-ADR-NNN` is returned unchanged (already cross-repo). A bare `ADR-NNN`
+    is qualified with the owning repo's `namespace` → `<namespace>-ADR-NNN`; if the repo has
+    no configured namespace the bare id cannot be qualified (stays repo-local) → None. No file
+    is renamed: this is purely a read-time normalisation (spec 004 US3, FR-003)."""
+    if _ADR_QUALIFIED.fullmatch(token):
+        return token
+    if _ADR_BARE.fullmatch(token):
+        if namespace:
+            return f"{namespace}-{token}"
+        return None
+    return None
+
+
+def extract_adr_refs(corpus: FragmentCorpus, namespace: str | None) -> dict[str, dict[str, str]]:
+    """Per-corpus ADR references → {qualified_adr_id: {kind: representative_locator}}.
+
+    Both qualified and bare forms are scanned; a bare id is qualified with `namespace` (the
+    owning repo's). Bare ids with no namespace are dropped (repo-local, never cross-matched).
+    Only citing kinds (spec/plan) and adr kinds participate, so a generic doc mentioning an
+    ADR id in passing never mints a citation. Representative = the min locator per (id, kind),
+    keeping the edge count bounded and deterministic."""
+    out: dict[str, dict[str, str]] = defaultdict(dict)
+    for f in corpus.fragments:
+        kind = f.kind
+        if kind != _ADR_KIND and kind not in _CITING_KINDS:
+            continue
+        role_kind = _ADR_KIND if kind == _ADR_KIND else "citing"
+        tokens = set(_ADR_QUALIFIED.findall(f.text or "")) | set(_ADR_BARE.findall(f.text or ""))
+        for tok in tokens:
+            qid = qualify_adr(tok, namespace)
+            if qid is None:
+                continue
+            cur = out[qid].get(role_kind)
+            out[qid][role_kind] = f.id if cur is None else min(cur, f.id)
+    return out
+
+
+def discover_adr_edges(manifest: WorkspaceManifest, corpora: dict[str, FragmentCorpus],
+                       namespaces: dict[str, str | None] | None = None) -> list[LinkEdge]:
+    """Deterministic `cites` edges: a citing fragment (spec/plan) → a decision (adr) sharing a
+    qualified ADR id (spec 004 US1, FR-002).
+
+    Bare `ADR-NNN` ids are qualified per-origin with that repo's configured namespace
+    (`namespaces[origin]`) before indexing, so a bare id stays repo-local — two repos that
+    each hold a bare `ADR-001` qualify to different namespaces and never cross-match; only the
+    fully-qualified form resolves across a repo boundary (FR-003)."""
+    namespaces = namespaces or {}
+    # qualified_adr_id → role_kind ("citing"/"adr") → {origin: representative_locator}
+    index: dict[str, dict[str, dict[str, str]]] = defaultdict(lambda: defaultdict(dict))
+    for origin in sorted(corpora):
+        ns = namespaces.get(origin)
+        for qid, by_kind in extract_adr_refs(corpora[origin], ns).items():
+            for role_kind, loc in by_kind.items():
+                cur = index[qid][role_kind].get(origin)
+                index[qid][role_kind][origin] = loc if cur is None else min(cur, loc)
+    edges: list[LinkEdge] = []
+    for qid in sorted(index):
+        citing = index[qid].get("citing", {})
+        adrs = index[qid].get("adr", {})
+        if not citing or not adrs:
+            continue
+        for c_origin in sorted(citing):
+            for a_origin in sorted(adrs):
+                if c_origin == a_origin and citing[c_origin] == adrs[a_origin]:
+                    continue  # same fragment is both citing-shaped and adr-shaped — skip self
+                edges.append(LinkEdge(
+                    src=_ep(c_origin, citing[c_origin]),
+                    dst=_ep(a_origin, adrs[a_origin]),
+                    rel=LinkRel.CITES,
+                    evidence_kind=LinkEvidenceKind.IDENTIFIER, evidence=qid))
+    return edges
+
+
 def _ns(origin: str, locator: str) -> str:
     pref = f"{origin}::"
     return locator if locator.startswith(pref) else pref + locator
@@ -115,12 +205,20 @@ def _key(e: LinkEdge) -> tuple:
 
 
 def build_link_graph(manifest: WorkspaceManifest, corpora: dict[str, FragmentCorpus],
-                     prose_edges: list[LinkEdge] | None = None) -> LinkGraph:
-    """Merge declared (trusted) + identifier (deterministic) + prose (agent), deduped by
-    (src, dst, rel) preferring the most-trusted evidence first. Deterministic."""
+                     prose_edges: list[LinkEdge] | None = None,
+                     namespaces: dict[str, str | None] | None = None) -> LinkGraph:
+    """Merge declared (trusted) + identifier + cites (deterministic) + prose (agent), deduped
+    by (src, dst, rel) preferring the most-trusted evidence first. Deterministic.
+
+    `namespaces` maps each member origin → its configured ADR namespace (from the repo's
+    `.spec-arch-governance.yml`), used to qualify bare `ADR-NNN` ids before citation discovery
+    (spec 004). Absent → bare ids stay repo-local and mint no cross-repo citation."""
     seen: set[tuple] = set()
     merged: list[LinkEdge] = []
-    for e in [*declared_edges(manifest), *discover_identifier_edges(manifest, corpora), *(prose_edges or [])]:
+    for e in [*declared_edges(manifest),
+              *discover_identifier_edges(manifest, corpora),
+              *discover_adr_edges(manifest, corpora, namespaces),
+              *(prose_edges or [])]:
         k = _key(e)
         if k in seen:
             continue

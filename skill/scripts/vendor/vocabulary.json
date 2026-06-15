@@ -1,0 +1,54 @@
+{
+  "id": "ARCH-ADR-000",
+  "title": "The shared vocabulary",
+  "version": "0.2.0",
+  "status": "accepted",
+  "license": "MIT",
+  "home": "spec-kit-arch-governance/docs/adr",
+  "roles": {
+    "values": ["source", "build", "standalone"],
+    "descriptions": {
+      "source": "Holds the authoritative specs and platform-level ADRs that other repos build against.",
+      "build": "Holds build-specs and implementation ADRs that cite a source.",
+      "standalone": "One repo that is both source and build; specs and ADRs co-located; intra-repo citations. First-class."
+    }
+  },
+  "kinds": {
+    "values": ["docs", "spec", "adr", "code"],
+    "descriptions": {
+      "docs": "Human-facing prose: guides, overviews, published documentation.",
+      "spec": "A specification: requirements, functional/architecture specs, plans.",
+      "adr": "An Architecture Decision Record: an immutable, namespaced ruling.",
+      "code": "Implementation."
+    }
+  },
+  "relations": {
+    "derived_from": {"subject": "spec", "object": "spec", "description": "This spec is derived from an upstream spec."},
+    "cites": {"subject": ["spec", "plan"], "object": "adr", "description": "This spec/plan is bound by the cited decision."},
+    "implements": {"subject": "code", "object": "spec", "description": "This code implements the named spec."},
+    "supersedes": {"subject": "adr", "object": "adr", "description": "This decision replaces an earlier one (which becomes historical, not deleted)."},
+    "references": {"subject": "any", "object": "any", "untyped": true, "description": "Untyped fallback only: a cross-reference whose precise relation is unknown. Never use when a typed relation fits."}
+  },
+  "evidence": {
+    "values": ["declared", "identifier", "prose"],
+    "read_side_only": true,
+    "descriptions": {
+      "declared": "Written in a config/front-matter and validated. Highest trust.",
+      "identifier": "A shared qualified identifier (an ADR ID or NNN-feature-slug) appearing in two places. Deterministic.",
+      "prose": "A literal cross-reference found in source text. Lowest trust; must quote the evidence."
+    }
+  },
+  "adr_id": {
+    "pattern": "^[A-Z][A-Z0-9]*-ADR-\\d{3,}$",
+    "bare_pattern": "^ADR-\\d{3,}$",
+    "example": "CORE-ADR-002",
+    "rules": [
+      "Namespace is a repo-chosen uppercase prefix identifying the repo's role/position in the domain (declared in the repo's config), not the project name.",
+      "An un-prefixed 'ADR-NNN' inherits the configured namespace of the repo it lives in (read as '<namespace>-ADR-NNN'); adoption requires no file renames.",
+      "The fully-qualified form is canonical and required for cross-repo citations; a bare 'ADR-NNN' resolves only within its own repo.",
+      "Numbers are allocated at acceptance; a not-yet-accepted decision occupies no number.",
+      "Accepted ADR bodies are immutable above an '## Amendments' heading.",
+      "A decision change is a new ADR that supersedes the old."
+    ]
+  }
+}

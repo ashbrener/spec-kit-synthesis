@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1.0",
+  "title": "Governed Portal",
+  "project_name": "governed",
+  "members": [
+    {"origin": "core", "path": "core/specs", "adapter": "speckit", "role": "spec", "title": "Core", "description": "The authoritative core specs."},
+    {"origin": "api", "path": "api/specs", "adapter": "speckit", "role": "spec", "title": "Api", "description": "The API build-specs."},
+    {"origin": "web", "path": "web/src", "adapter": "code", "role": "code", "title": "Web", "description": "The standalone web service."}
+  ]
+}

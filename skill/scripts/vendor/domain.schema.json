@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ashbrener/spec-kit-arch-governance/blob/main/docs/adr/domain.schema.json",
+  "title": "spec-kit-arch-governance domain manifest (.spec-arch-domain.yml)",
+  "description": "The single shared record of a multi-repo governance domain — the namespace registry. A reader conforms to this format (in code, no runtime dependency). NOTE: cross-member uniqueness — each member's `name` and `namespace` MUST be unique across the set — is a WRITER invariant, not expressible in this structural schema; the writer enforces it. See INTEGRATION.md for the writer<->reader boundary.",
+  "x-format-version": "v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["members"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Manifest format version.",
+      "$comment": "e.g. \"v1\""
+    },
+    "members": {
+      "type": "array",
+      "description": "The members of the domain. Each member's name and namespace must be unique (writer-enforced).",
+      "items": { "$ref": "#/$defs/member" }
+    }
+  },
+  "$defs": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "namespace", "locator"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human label for the repo in the set; unique across members."
+        },
+        "role": {
+          "type": "string",
+          "description": "The repo's role in the citation graph (must equal the shared vocabulary's roles).",
+          "enum": ["source", "build", "standalone"]
+        },
+        "namespace": {
+          "type": "string",
+          "description": "The repo's role-based ADR prefix; unique across members (the registry)."
+        },
+        "locator": {
+          "type": "string",
+          "description": "How to reach this member, relative to the authority repo (sibling path | git URL).",
+          "$comment": "e.g. \".\" for the authority itself, \"../service\" for a sibling, or a git URL"
+        }
+      }
+    }
+  }
+}
