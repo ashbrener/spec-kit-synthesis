@@ -243,8 +243,9 @@ Synthesis needs **no configuration file** — install and invoke. Two optional i
 - **Theme (optional).** Match a host project's look: `theme_detect.py` reads a project's CSS custom
   properties / Tailwind tokens into a theme JSON, which you pass via `--theme`. Fail-soft: unknown
   tokens keep the defaults.
-- **Governed reading (automatic).** When a project adopts the architecture-governance convention,
-  atlas reads its published contracts *as a documented format* (no runtime dependency, read-only): a
+- **Governed reading (automatic).** When a project adopts the
+  [spec-kit-arch-governance](https://github.com/ashbrener/spec-kit-arch-governance) convention, atlas
+  reads its published contracts *as a documented format* (no runtime dependency, read-only): a
   declared **`.spec-arch-domain.yml`** is the source-of-truth topology (members/roles/namespaces/
   locators, graded `declared`); **typed citations** match the shared vocabulary (`cites` for a
   plan→decision, `implements` for code→spec, `derived_from` for spec→spec, `references` otherwise);
