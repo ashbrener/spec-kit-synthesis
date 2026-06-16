@@ -42,6 +42,7 @@ class SourceType(str, Enum):
 
     SPEC = "spec"
     DESIGN_DOC = "design_doc"
+    ADR = "adr"            # an architecture decision record (so a chip renders as an ADR, not a doc)
     CODE = "code"
 
 

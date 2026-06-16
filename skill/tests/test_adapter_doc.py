@@ -72,10 +72,12 @@ def test_corpus_validates(docs_tree: Path):
     assert corpus.fragments, "corpus must be non-empty"
 
 
-def test_all_fragments_design_doc_typed_with_self_locator(docs_tree: Path):
+def test_fragments_typed_doc_or_adr_with_self_locator(docs_tree: Path):
     corpus = adapter_doc.build_corpus(docs_tree, "Demo")
     for f in corpus.fragments:
-        assert f.source.type is SourceType.DESIGN_DOC
+        # ADRs are adr-typed (spec 006 §4); all other docs are design_doc-typed
+        expected = SourceType.ADR if f.kind == "adr" else SourceType.DESIGN_DOC
+        assert f.source.type is expected
         assert f.source.locator == f.id, "locator must equal id (self-referential)"
 
 
@@ -200,3 +202,31 @@ def test_cli_writes_validated_corpus(docs_tree: Path, tmp_path: Path):
     corpus = FragmentCorpus.model_validate_json(out.read_text(encoding="utf-8"))
     assert corpus.project_name == "CLI Demo"
     assert corpus.fragments
+
+
+def test_adapter_doc_skips_hidden_and_vendored_trees(tmp_path):
+    # product content
+    (tmp_path / "02_System_Architecture" / "ADRs").mkdir(parents=True)
+    (tmp_path / "02_System_Architecture" / "ADRs" / "ADR-001-x.md").write_text("# ADR-001: X\n", encoding="utf-8")
+    (tmp_path / "guide.md").write_text("# Guide\n", encoding="utf-8")
+    # pollution: a vendored extension runtime + its fixtures, scaffolding, tooling (all dot-dirs)
+    for poison in (".specify/extensions/arch-governance/docs/adr", ".specify/extensions/arch-governance/tests/fixtures/x/adr",
+                   ".project-arc/template-base", ".claude/skills", ".venv/lib", "node_modules/pkg"):
+        d = tmp_path / poison
+        d.mkdir(parents=True)
+        (d / "ADR-999-poison.md").write_text("# ADR-999: poison\n", encoding="utf-8")
+    corpus = adapter_doc.build_corpus(tmp_path, "Repo")
+    locs = [f.id for f in corpus.fragments]
+    assert any("ADR-001" in loc for loc in locs) and any("guide" in loc for loc in locs)  # product kept
+    assert not any(".specify" in loc or ".project-arc" in loc or ".claude" in loc
+                   or ".venv" in loc or "node_modules" in loc for loc in locs)            # pollution gone
+    assert not any("poison" in loc for loc in locs)
+
+
+def test_adapter_doc_extra_exclude(tmp_path):
+    (tmp_path / "keep").mkdir(); (tmp_path / "keep" / "a.md").write_text("# A\n", encoding="utf-8")
+    (tmp_path / "_Audits").mkdir(); (tmp_path / "_Audits" / "b.md").write_text("# B\n", encoding="utf-8")
+    corpus = adapter_doc.build_corpus(tmp_path, "Repo", exclude={"_Audits"})
+    locs = [f.id for f in corpus.fragments]
+    assert any("keep/a.md" in loc for loc in locs)
+    assert not any("_Audits" in loc for loc in locs)

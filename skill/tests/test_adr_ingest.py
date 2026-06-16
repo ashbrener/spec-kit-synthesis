@@ -74,15 +74,15 @@ def repo_docs(tmp_path: Path) -> Path:
     return root
 
 
-def test_adrs_become_adr_kind_design_doc_typed(repo_docs: Path):
+def test_adrs_become_adr_kind_and_adr_typed(repo_docs: Path):
     corpus = adapter_doc.build_corpus(repo_docs, project_name="Repo")
     FragmentCorpus.model_validate_json(corpus.model_dump_json())  # frozen-schema round-trip
 
     adr_frags = [f for f in corpus.fragments if f.kind == "adr"]
     assert adr_frags, "both ADRs must be ingested as kind='adr'"
-    # every ADR fragment is design_doc-typed with a self-referential locator + adr chip
+    # every ADR fragment is adr-typed (spec 006 §4) with a self-referential locator + adr chip
     for f in adr_frags:
-        assert f.source.type is SourceType.DESIGN_DOC
+        assert f.source.type is SourceType.ADR
         assert f.source.locator == f.id, "locator must equal id (resolver invariant)"
         assert f.source.name.startswith("adr · ")
     # the plain doc stays a design-doc, never reclassified as adr

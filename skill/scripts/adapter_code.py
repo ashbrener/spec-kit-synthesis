@@ -34,7 +34,14 @@ from schema import Fragment, FragmentCorpus, SourceRef, SourceType
 DEFAULT_EXTS = {".sh", ".bash", ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rb", ".rs"}
 
 # Directories never worth walking.
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".synthesis", ".claude"}
+SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build"}
+
+
+def _is_skipped(rel_parts, extra: set[str] = frozenset()) -> bool:
+    """Skip any path with a HIDDEN part (.git, .venv, .specify, .project-arc, .claude, … — all
+    dot-dirs, present and future) or a part in SKIP_DIRS / the caller's extra excludes. This keeps
+    vendored extension runtimes, scaffolding, and tooling trees out of the product corpus."""
+    return any(part.startswith(".") or part in SKIP_DIRS or part in extra for part in rel_parts)
 
 # Language → ordered (regex, group) patterns for top-level definitions. The
 # regex must match at column 0 (top-level) to keep it to genuine definitions.
@@ -95,12 +102,13 @@ def fragments_for_file(path: Path, rel: str) -> list[Fragment]:
     return out
 
 
-def build_corpus(src_dir: Path, project_name: Optional[str], exts: set[str]) -> FragmentCorpus:
+def build_corpus(src_dir: Path, project_name: Optional[str], exts: set[str],
+                 exclude: set[str] = frozenset()) -> FragmentCorpus:
     files: list[Path] = []
     for p in sorted(src_dir.rglob("*")):
         if not p.is_file():
             continue
-        if any(part in SKIP_DIRS for part in p.relative_to(src_dir).parts):
+        if _is_skipped(p.relative_to(src_dir).parts, exclude):
             continue
         if p.suffix.lower() in exts:
             files.append(p)
@@ -119,6 +127,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("src_dir", help="Path to the source tree to adapt.")
     parser.add_argument("--project-name", default=None)
     parser.add_argument("--include", default=None, help="Comma-separated extensions (e.g. sh,py) to override defaults.")
+    parser.add_argument("--exclude", default=None, help="Comma-separated extra dir names to skip (hidden dot-dirs are always skipped).")
     parser.add_argument("--out", default=None, help="Write JSON here (default: stdout).")
     args = parser.parse_args(argv)
 
@@ -128,7 +137,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 2
     exts = ({"." + e.lstrip(".").lower() for e in args.include.split(",")}
             if args.include else DEFAULT_EXTS)
-    corpus = build_corpus(src, args.project_name, exts)
+    exclude = {e.strip() for e in args.exclude.split(",")} if args.exclude else frozenset()
+    corpus = build_corpus(src, args.project_name, exts, exclude=exclude)
     payload = corpus.model_dump_json(indent=2)
     if args.out:
         Path(args.out).write_text(payload)
