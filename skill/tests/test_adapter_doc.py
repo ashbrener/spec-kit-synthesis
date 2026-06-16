@@ -230,3 +230,20 @@ def test_adapter_doc_extra_exclude(tmp_path):
     locs = [f.id for f in corpus.fragments]
     assert any("keep/a.md" in loc for loc in locs)
     assert not any("_Audits" in loc for loc in locs)
+
+
+def test_adapter_doc_path_prefix_exclude(tmp_path):
+    # a path-prefix exclude skips exactly that subtree; a similarly-named leaf elsewhere is kept
+    (tmp_path / "specs" / "001-a").mkdir(parents=True)
+    (tmp_path / "specs" / "001-a" / "spec.md").write_text("# A\n", encoding="utf-8")
+    (tmp_path / "docs" / "adr").mkdir(parents=True)
+    (tmp_path / "docs" / "adr" / "ADR-001.md").write_text("# ADR-001\n", encoding="utf-8")
+    (tmp_path / "specsheet").mkdir()
+    (tmp_path / "specsheet" / "y.md").write_text("# Y\n", encoding="utf-8")
+    (tmp_path / "guide.md").write_text("# Guide\n", encoding="utf-8")
+    corpus = adapter_doc.build_corpus(tmp_path, "Repo", exclude={"specs", "docs/adr"})
+    locs = [f.id for f in corpus.fragments]
+    assert any("guide" in loc for loc in locs)                       # narrative kept
+    assert any("specsheet" in loc for loc in locs)                   # bare-name "specs" != "specsheet"
+    assert not any(loc.startswith("specs/") for loc in locs)         # specs subtree excluded (name)
+    assert not any("docs/adr" in loc for loc in locs)                # adr subtree excluded (prefix)

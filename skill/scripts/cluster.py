@@ -25,10 +25,35 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pydantic import BaseModel  # noqa: E402
-from schema import FragmentCorpus, LinkGraph  # noqa: E402
+from schema import FragmentCorpus, LinkGraph, SourceType  # noqa: E402
 
 # The cross-repo relations strong enough to mean "same capability" (excludes untyped `references`).
 _STRONG_RELS = {"derived_from", "cites", "implements"}
+
+# Spec-kit artifact kinds that make a cluster a CAPABILITY (vs a lone decision / background).
+_SPEC_KINDS = {"spec", "plan", "tasks", "data-model", "contract", "research"}
+
+
+def _classify(fids: list[str], index: dict) -> str:
+    """Label a cluster by membership (spec 007): capability (has a spec/code), else decision (only
+    ADRs), else background (only free-form narrative). Pure + deterministic."""
+    has_spec = has_adr = has_code = False
+    for fid in fids:
+        f = index.get(fid)
+        if f is None:
+            continue
+        t = f.source.type
+        if t is SourceType.CODE or f.kind in ("code", "code-symbol"):
+            has_code = True
+        elif t is SourceType.ADR or f.kind == "adr":
+            has_adr = True
+        elif t is SourceType.SPEC or f.kind in _SPEC_KINDS:
+            has_spec = True
+    if has_spec or has_code:
+        return "capability"
+    if has_adr:
+        return "decision"
+    return "background"
 
 
 class CapabilityCluster(BaseModel):
@@ -41,6 +66,7 @@ class CapabilityCluster(BaseModel):
     members: dict[str, list[str]] = {}       # origin -> fragment ids (grouped by tier)
     tiers: list[str] = []                    # contributing origins, source first
     evidence: list[str] = []                 # why members joined — reviewable
+    kind: str = "capability"                 # capability | decision | background (spec 007)
 
 
 class ClusterSet(BaseModel):
@@ -89,6 +115,7 @@ def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
     `corpora` maps origin -> its origin-stamped FragmentCorpus; `source_origins` are the origins whose
     role is source (their features seed/anchor capabilities)."""
     uf = _UF()
+    index = {f.id: f for c in corpora.values() for f in c.fragments}  # for classification (spec 007)
     frag_origin: dict[str, str] = {}
     frag_feature: dict[str, str | None] = {}
     # feature anchor key (origin::feature_key) -> representative fragment id, for intra-feature union
@@ -151,10 +178,14 @@ def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
         # collect evidence accumulated for any root that merged into this component
         ev = sorted(set(evidence_by_root.get(root, [])))
         cid = seed or f"orphan:{min(fids)}"
-        clusters.append(CapabilityCluster(id=cid, seed=seed, members=members, tiers=tiers, evidence=ev))
+        kind = _classify(fids, index)
+        clusters.append(CapabilityCluster(id=cid, seed=seed, members=members, tiers=tiers,
+                                          evidence=ev, kind=kind))
 
-    # deterministic order: source-seeded first (by id), then orphans (by id)
-    clusters.sort(key=lambda c: (c.seed is None, c.id))
+    # deterministic order: capabilities first, then decisions, then background; within each, the
+    # source-seeded ahead of orphans, by id.
+    _kind_rank = {"capability": 0, "decision": 1, "background": 2}
+    clusters.sort(key=lambda c: (_kind_rank.get(c.kind, 3), c.seed is None, c.id))
     return ClusterSet(clusters=clusters, unclustered=sorted(unclustered))
 
 

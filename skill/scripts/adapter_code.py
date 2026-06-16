@@ -37,11 +37,22 @@ DEFAULT_EXTS = {".sh", ".bash", ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rb
 SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build"}
 
 
-def _is_skipped(rel_parts, extra: set[str] = frozenset()) -> bool:
+def _is_skipped(rel: str, extra=frozenset()) -> bool:
     """Skip any path with a HIDDEN part (.git, .venv, .specify, .project-arc, .claude, … — all
-    dot-dirs, present and future) or a part in SKIP_DIRS / the caller's extra excludes. This keeps
-    vendored extension runtimes, scaffolding, and tooling trees out of the product corpus."""
-    return any(part.startswith(".") or part in SKIP_DIRS or part in extra for part in rel_parts)
+    dot-dirs) or a part in SKIP_DIRS, plus the caller's `extra` excludes. An `extra` entry containing
+    `/` is a PATH-PREFIX (skip exactly that subtree, spec 007); a bare name matches a path part. This
+    keeps vendored runtimes/tooling out, and lets a source's narrative pass skip its specs/adr subtrees."""
+    parts = rel.split("/")
+    if any(part.startswith(".") or part in SKIP_DIRS for part in parts):
+        return True
+    for e in extra:
+        if "/" in e:
+            e = e.rstrip("/")
+            if rel == e or rel.startswith(e + "/"):
+                return True
+        elif e in parts:
+            return True
+    return False
 
 # Language → ordered (regex, group) patterns for top-level definitions. The
 # regex must match at column 0 (top-level) to keep it to genuine definitions.
@@ -108,7 +119,7 @@ def build_corpus(src_dir: Path, project_name: Optional[str], exts: set[str],
     for p in sorted(src_dir.rglob("*")):
         if not p.is_file():
             continue
-        if _is_skipped(p.relative_to(src_dir).parts, exclude):
+        if _is_skipped(p.relative_to(src_dir).as_posix(), exclude):
             continue
         if p.suffix.lower() in exts:
             files.append(p)

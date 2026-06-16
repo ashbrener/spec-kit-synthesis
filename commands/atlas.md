@@ -177,9 +177,17 @@ Write a SINGLE melded pair over the **merged** corpus (not one per repo):
 .synthesis-portal/document_model.json        (compose: one Section per capability)
 ```
 
-Use `clusters.json` as the **section spine** — each cluster is one capability (name it; you may group
-adjacent clusters into a theme like "Identity & Access", but never invent or split membership). For
-each capability `Section`:
+Use `clusters.json` as the **section spine**. Each cluster carries a `kind` (spec 007):
+
+- **`capability`** (has a spec/code) → a story **Section** (name it; you may group adjacent capability
+  clusters into a theme like "Identity & Access", but never invent or split membership). A **cited**
+  decision is already inside its capability cluster — render it **inline** within that capability.
+- **`decision`** (an uncited ADR) → do NOT make it a capability section; gather all of these into a
+  single **Decisions appendix** section near the end.
+- **`background`** (only free-form narrative) → do NOT make it a capability section; fold it into a
+  short **Overview / Background** section. Never auto-attach background to a capability.
+
+For each capability `Section`:
 
 - open with a plain-English **functional narrative** from the source layer — `Block`s with **no
   `tier`** (always visible, an exec reads only these);

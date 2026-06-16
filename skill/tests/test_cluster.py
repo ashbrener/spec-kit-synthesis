@@ -77,3 +77,36 @@ def test_clustering_is_reproducible():
     a = cl.build_clusters(corpora, lg, source_origins={"core"}).model_dump_json()
     b = cl.build_clusters(corpora, lg, source_origins={"core"}).model_dump_json()
     assert a == b
+
+
+# ── classification: capability / decision / background (spec 007) ────────────
+
+def test_cluster_classification():
+    core = _corpus("core", [
+        _frag("core", "auth/spec.md", "auth"),                                          # spec
+        _frag("core", "ADR-009.md", "ADR-009", kind="adr", typ=SourceType.ADR),         # cited ADR
+        _frag("core", "ADR-050.md", "ADR-050", kind="adr", typ=SourceType.ADR),         # uncited ADR
+        _frag("core", "01_overview/intro.md", "01_overview", kind="design-doc", typ=SourceType.DESIGN_DOC),  # narrative
+    ])
+    api = _corpus("api", [_frag("api", "007-auth/plan.md", "007-auth")])
+    lg = LinkGraph(edges=[
+        _edge("api", "007-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM),
+        _edge("core", "auth/spec.md", "core", "ADR-009.md", LinkRel.CITES),             # auth cites ADR-009
+    ])
+    cs = cl.build_clusters({"core": core, "api": api}, lg, source_origins={"core"})
+
+    def members_str(c):
+        return " ".join(f for fs in c.members.values() for f in fs)
+
+    # the auth capability (source spec + build spec + the cited ADR) is a capability
+    cap = [c for c in cs.clusters if c.kind == "capability"]
+    assert any("auth/spec.md" in members_str(c) and "007-auth" in members_str(c) for c in cap)
+    # the cited ADR-009 rides INSIDE the capability — never its own decision
+    assert not any("ADR-009" in members_str(c) for c in cs.clusters if c.kind == "decision")
+    assert any("ADR-009" in members_str(c) for c in cap)
+    # the uncited ADR-050 is a decision; the narrative is background
+    assert any("ADR-050" in members_str(c) for c in cs.clusters if c.kind == "decision")
+    assert any("01_overview" in members_str(c) for c in cs.clusters if c.kind == "background")
+    # capabilities are ordered ahead of decisions/background
+    kinds = [c.kind for c in cs.clusters]
+    assert kinds == sorted(kinds, key={"capability": 0, "decision": 1, "background": 2}.get)
