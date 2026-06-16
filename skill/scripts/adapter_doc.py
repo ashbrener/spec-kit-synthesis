@@ -45,10 +45,14 @@ from schema import (  # noqa: E402  (path shim must precede import)
 DEFAULT_EXTS = {".md", ".markdown"}
 
 # Directories never worth walking (mirrors adapter_code.SKIP_DIRS).
-SKIP_DIRS = {
-    ".git", "node_modules", ".venv", "venv", "__pycache__",
-    "dist", "build", ".synthesis", ".claude",
-}
+SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build"}
+
+
+def _is_skipped(rel_parts, extra: set[str] = frozenset()) -> bool:
+    """Skip any path with a HIDDEN part (.git, .venv, .specify, .project-arc, .claude, … — all
+    dot-dirs) or a part in SKIP_DIRS / the caller's extra excludes. Keeps vendored extension
+    runtimes, their tests/fixtures, and tooling trees out of the product corpus."""
+    return any(part.startswith(".") or part in SKIP_DIRS or part in extra for part in rel_parts)
 
 # ── ADR detection (deterministic, path-based) ───────────────────────────────
 # A doc is an ADR if any path part names an ADR location, or the filename is an
@@ -174,7 +178,7 @@ def _fragments_for_file(rel: str, text: str, adr_root: Optional[str] = None) -> 
             locator = f"{rel}#{slug_final}"
 
         source = SourceRef(
-            type=SourceType.DESIGN_DOC,
+            type=SourceType.ADR if is_adr else SourceType.DESIGN_DOC,
             name=f"{chip} · {rel}",
             locator=locator,
             anchor=anchor,
@@ -196,6 +200,7 @@ def build_corpus(
     project_name: Optional[str] = None,
     exts: Optional[set[str]] = None,
     adr_dir: Optional[Path] = None,
+    exclude: set[str] = frozenset(),
 ) -> FragmentCorpus:
     """Walk `<docs_dir>` and build a validated DESIGN_DOC FragmentCorpus.
 
@@ -235,7 +240,7 @@ def build_corpus(
         for p in sorted(root.rglob("*")):
             if not p.is_file():
                 continue
-            if any(part in SKIP_DIRS for part in p.relative_to(root).parts):
+            if _is_skipped(p.relative_to(root).parts, exclude):
                 continue
             if p.suffix.lower() in exts:
                 files.append(p)
@@ -270,6 +275,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "every markdown doc at/below it is ingested as kind='adr' (FR-008). "
         "Absolute, or relative to docs_dir.",
     )
+    parser.add_argument("--exclude", default=None, help="Comma-separated extra dir names to skip (hidden dot-dirs are always skipped).")
     parser.add_argument("--out", default=None, help="Write JSON here (default: stdout).")
     args = parser.parse_args(argv)
 
@@ -283,7 +289,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         else DEFAULT_EXTS
     )
     adr_dir = Path(args.adr_dir) if args.adr_dir else None
-    corpus = build_corpus(docs, args.project_name, exts, adr_dir=adr_dir)
+    exclude = {e.strip() for e in args.exclude.split(",")} if args.exclude else frozenset()
+    corpus = build_corpus(docs, args.project_name, exts, adr_dir=adr_dir, exclude=exclude)
     payload = corpus.model_dump_json(indent=2)
     if args.out:
         Path(args.out).write_text(payload + "\n", encoding="utf-8")
