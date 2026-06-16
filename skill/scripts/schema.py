@@ -289,7 +289,7 @@ class DiagramGraph(BaseModel):
     """Declarative diagram intent; the renderer lays it out to interactive SVG (DESIGN §6)."""
 
     model_config = {"extra": "forbid"}
-    layout: Literal["pipeline", "mapping", "ladder", "flow", "panel", "hub", "stack", "timeline"] = "pipeline"
+    layout: Literal["pipeline", "mapping", "ladder", "flow", "panel", "hub", "stack", "timeline", "sequence", "erd"] = "pipeline"
     title: Optional[str] = Field(None, description="Optional diagram title, rendered in the display face above the figure (renderer v2).")
     nodes: list[DiagramNode] = Field(default_factory=list)
     edges: list[DiagramEdge] = Field(default_factory=list)
@@ -302,6 +302,11 @@ class Block(BaseModel):
 
     type: BlockType
     altitude: Altitude = Altitude.FUNCTIONAL
+    # Melded SITE layer (spec 006): which tier/member this block draws from (e.g. "backend",
+    # "frontend"); None = the functional/source layer (always visible). The renderer groups
+    # TECHNICAL blocks by `tier` into per-tier disclosures.
+    tier: Optional[str] = Field(default=None, description="Contributing tier/member origin; None = functional/source layer.")
+    build_status: Optional[Literal["built", "partial", "planned"]] = Field(default=None, description="Per-block build grade; 'planned' renders faded. None inherits the tier/section grade.")
     # Exactly one payload is set, matching `type`:
     prose: Optional[str] = None
     prose_style: Optional[Literal["lead", "pull"]] = Field(default=None, description="PROSE-only: render as a lead paragraph ('lead') or a pull-quote ('pull').")
@@ -338,6 +343,7 @@ class Section(BaseModel):
     title: str
     strap: Optional[str] = Field(None, description="Short eyebrow shown beside the section number ('NN — strap'). Renderer v2.")
     subtitle: Optional[str] = None
+    build_status: Optional[Literal["built", "partial", "planned"]] = Field(default=None, description="Capability-level build grade (spec 006); shown as a badge by the heading.")
     blocks: list[Block] = Field(default_factory=list)
 
 

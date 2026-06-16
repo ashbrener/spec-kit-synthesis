@@ -4,6 +4,22 @@ All notable changes to **spec-kit-synthesis** are documented here. The format fo
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The multi-repo portal is now ONE melded, capability-organized story** (spec 006), replacing the
+  book-of-books. `speckit.synthesis.atlas` reasons a single document over the merged workspace corpus,
+  organized by **capabilities** (deterministically clustered over the cross-repo link graph — no
+  external graph dependency), each woven across tiers: a functional narrative + per-tier technical
+  disclosures (backend / frontend), every claim drilling to its owning repo.
+- **Built vs planned** — capabilities and tiers are graded built / partial / planned (from code
+  coverage + spec lifecycle); planned work renders faded.
+- **Human-titled source tables** replace raw filename citation chips; a **hierarchical source index**
+  (`catalog.html`, repo › feature › artifacts) replaces the edge-list atlas; nested navigation.
+- **New diagram layouts** `sequence` (cross-tier request path) and `erd` (data model).
+- The single-repo storybook (PAGE layer) and the fail-closed gates are unchanged.
+
 ## [0.1.0] — 2026-06-16
 
 First public release — packaged as a spec-kit extension (`specify extension add synthesis`).
