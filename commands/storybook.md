@@ -1,7 +1,6 @@
 ---
-name: speckit-storybook
+name: speckit.synthesis.storybook
 description: Synthesize a project's scattered spec-kit specs into ONE faithful, beautiful, interactive whole-system architecture storybook (HTML). Use when someone wants a single plain-English "here is how this whole system is built" document generated from a repo's specs/ folders — for onboarding an engineer, briefing an evaluator, or seeing the de-fragmented current-state architecture. NOT a dashboard, NOT a per-spec renderer.
-user-invocable: true
 ---
 
 # spec-kit-synthesis — the architecture storybook generator
@@ -42,11 +41,20 @@ algorithm.
 
 ## Toolchain
 
-All scripts run via **`uv`** (never `pip`, never system Python):
-`uv run python ${CLAUDE_PLUGIN_ROOT}/skill/scripts/<script>.py …`. The scripts need only `pydantic`
-(declared in `pyproject.toml`); `uv` builds the venv on first run. As an installed
-plugin, the scripts and their `pyproject.toml` live at `${CLAUDE_PLUGIN_ROOT}`, so run
-them against the plugin's own project: `uv run --project "${CLAUDE_PLUGIN_ROOT}" python "${CLAUDE_PLUGIN_ROOT}/skill/scripts/<script>.py" …`.
+All scripts run via **`uv`** (never `pip`, never system Python). First locate the
+extension root (`$SYN`):
+
+```
+# installed as a spec-kit extension (the usual case):
+SYN=.specify/extensions/synthesis
+# …or running inside the synthesis repo itself (development):
+SYN=.
+```
+
+Run scripts with their deps provided ephemerally — this builds a correct, throwaway
+env and **ignores any stale vendored `.venv`** (a `--dev` install copies one whose
+paths are broken): `uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/<script>.py" …`.
+(The scripts need only `pydantic` + `pyyaml`.) The examples below use `$SYN`.
 
 ## The pipeline (run these phases in order)
 
@@ -65,7 +73,7 @@ is reviewable and re-runnable. These are build IR, not products.
 ### Phase 0 — Adapt (deterministic; you just run it)
 
 ```
-uv run python ${CLAUDE_PLUGIN_ROOT}/skill/scripts/adapter_speckit.py <specs_dir> --project-name "<Name>" --out .synthesis/corpus.json
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/adapter_speckit.py" <specs_dir> --project-name "<Name>" --out .synthesis/corpus.json
 ```
 
 Produces a `FragmentCorpus`: every spec file split into source-typed
@@ -168,7 +176,7 @@ Persist `.synthesis/document_model.json`.
 ### Phase D — Verify (deterministic gate; FAIL-CLOSED)
 
 ```
-uv run python ${CLAUDE_PLUGIN_ROOT}/skill/scripts/verify.py .synthesis/document_model.json .synthesis/architecture_model.json .synthesis/corpus.json
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/verify.py" .synthesis/document_model.json .synthesis/architecture_model.json .synthesis/corpus.json
 ```
 
 Exit 0 ⇒ every claim's provenance resolves, every block's claims exist and are
@@ -179,7 +187,7 @@ fabricated locator, or a missing coverage note). Never edit the gate to pass.
 ### Render (deterministic)
 
 ```
-uv run python ${CLAUDE_PLUGIN_ROOT}/skill/scripts/render.py .synthesis/document_model.json [--theme theme.json] --out architecture.html
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/render.py" .synthesis/document_model.json [--theme theme.json] --out architecture.html
 ```
 
 Produces the self-contained interactive storybook in the editorial design system
