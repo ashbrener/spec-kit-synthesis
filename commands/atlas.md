@@ -6,17 +6,17 @@ description: Synthesize a WORKSPACE of repositories into one interactive documen
 # speckit-atlas — the documentation portal generator
 
 You (the in-session agent) **are the reasoning engine** — the same as in the
-`speckit-storybook` skill, applied across a *workspace* of repositories. Atlas is
-the **book-of-books**: it runs the unchanged storybook engine once per member to
-produce a faithful, plain-English page per repo, then connects those pages with a
-**verified, fail-closed traceability atlas** (docs → specs → code).
+`speckit-storybook` skill, applied across a *workspace* of repositories. Atlas produces **ONE melded,
+capability-organized story** (spec 006) — not a book-of-books. Sections are capabilities (e.g.
+"Authentication"), each woven across the tiers: a plain-English functional narrative from the source
+layer, then per-tier technical detail (backend, frontend) each linking to its own repo; built work
+renders solid, planned faded. The deterministic capability clustering (over the verified cross-repo
+link graph) is the spine; a hierarchical source index replaces the old graph.
 
-Atlas is layered strictly ON TOP of the page engine (DESIGN PAGE-vs-SITE seam):
-the SITE layer (portal index + atlas graph + cross-repo links) is purely
-additive and **never touches per-page reasoning**. Every per-member page is built
-exactly as `speckit-storybook` builds a single repo — same three phases, same
-invariants, same `verify.py` gate. If you have not read the storybook skill, read
-it first: atlas inherits all of its non-negotiable invariants verbatim.
+Atlas is the SITE layer over the page engine (DESIGN PAGE-vs-SITE seam): it reuses the same
+`DocumentModel` renderer and the same fail-closed gates (`verify.py` over the merged corpus +
+`verify_links.py` over the cross-repo edges), applied to ONE melded document. If you have not read the
+storybook skill, read it first: atlas inherits all of its non-negotiable invariants verbatim.
 
 ## Inherited invariants (do not violate)
 
@@ -143,47 +143,60 @@ fail-closed (the build stops). Record a `url` + `pin` so the source *can* be
 fetched for a complete build; checking it out is the operator's job (Phase F will
 automate the fetch).
 
-## The pipeline (run in order)
+## The pipeline (run in order) — ONE melded story (spec 006)
+
+The portal is **one capability-organized story**, NOT a book-of-books. You reason a single melded
+pair over the MERGED workspace corpus; the spine is the deterministic capability clustering.
 
 ```
 manifest ─[stage 0 adapt: code]→ per-member origin-stamped corpus.json + locators.txt
-         ─[reason EACH member: YOU]→ <origin>/architecture_model.json + document_model.json
-         ─[discover links: code+YOU]→ link_graph.json  (declared + identifier; +prose by you)
-         ─[verify_links: code, FAIL-CLOSED]→ (gate)
-         ─[finish render: code]→ out/{index,<origin>…,atlas}.html
+         ─[merge + cluster: code]→ merged_corpus.json + clusters.json + build_status.json + title_map.json
+         ─[reason ONE MELD: YOU]→ architecture_model.json + document_model.json  (capabilities)
+         ─[verify_links + verify: code, FAIL-CLOSED]→ (gates)
+         ─[finish render: code]→ out/{index.html, catalog.html, sources/…}
 ```
 
-### Stage 0 — Adapt (deterministic; you just run it)
+### Stage 0 — Adapt + cluster (deterministic; you just run it)
 
 ```
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    synthesis.workspace.json --work .synthesis-portal
+    --from . --work .synthesis-portal
 ```
 
-This adapts every present member with its declared adapter and **origin-stamps**
-its corpus (Phase A `with_origin`) so locators are globally unique across the
-workspace — no cross-member collisions. It writes each member's `corpus.json` +
-`locators.txt`, builds the candidate `link_graph.json` (declared + shared-identifier
-edges), and prints a per-member hand-off brief. Missing optional members are
-listed as skipped; a missing required member stops here.
+This adapts every present member (build-repo **code** included, for build-status), origin-stamps each
+corpus, builds `link_graph.json`, **merges** the corpora, and clusters them into **capabilities**
+(`clusters.json`) with a per-capability build status (`build_status.json`) and human source titles
+(`title_map.json`). It prints the cluster spine + a hand-off brief.
 
-### Reason each member (YOUR reasoning — the same three phases, per member)
+### Reason ONE melded story (YOUR reasoning — across repos, by capability)
 
-For **each** member, do exactly what `speckit-storybook` does — extract →
-reconcile → compose — but scoped to that member, **using ONLY that member's
-locators** (`<work>/<origin>/locators.txt`). Write the two IR artifacts into the
-member's work dir:
+Write a SINGLE melded pair over the **merged** corpus (not one per repo):
 
 ```
-.synthesis-portal/<origin>/architecture_model.json   (reconcile)
-.synthesis-portal/<origin>/document_model.json        (compose)
+.synthesis-portal/architecture_model.json   (reconcile, across all repos)
+.synthesis-portal/document_model.json        (compose: one Section per capability)
 ```
 
-Write for a **general reader** (invariant #8): each page is the plain-English read
-of its source, simpler than the markdown, every claim's source one click away. At
-scale, fan out — one sub-agent (Task tool) per member — each returning that
-member's IR. The members are orthogonal (disjoint sources, disjoint locators), so
-this parallelizes cleanly.
+Use `clusters.json` as the **section spine** — each cluster is one capability (name it; you may group
+adjacent clusters into a theme like "Identity & Access", but never invent or split membership). For
+each capability `Section`:
+
+- open with a plain-English **functional narrative** from the source layer — `Block`s with **no
+  `tier`** (always visible, an exec reads only these);
+- then **per-tier technical** `Block`s tagged `tier` (e.g. `"backend"`, `"frontend"`) — endpoints,
+  data model, services for backend; the cross-tier integration (client → API → store) for frontend.
+  The renderer groups these into per-tier disclosures;
+- set `build_status` (built / partial / planned) on the section and on tier blocks from
+  `build_status.json` — planned work renders faded;
+- be **diagram-forward**: give each capability the diagrams that fit — an architecture-at-a-glance, a
+  `sequence` (cross-tier request path), an `erd` (data model);
+- cite the **merged corpus** (every claim resolves there; `verify.py` gates it) — each chip drills to
+  its owning repo's source.
+
+Write for a **general reader** (invariant #8): simpler than the markdown, every claim a click from
+its source. At scale, fan out — one sub-agent (Task tool) per capability cluster — each returning its
+`Section`(s); then assemble the one `document_model.json`. (An `architecture_model.json` over the
+merged corpus carries the reconciled claims the doc's `claim_ids` resolve against.)
 
 ### Discover cross-repo links (deterministic + YOUR reasoning)
 
@@ -226,26 +239,30 @@ extension, read-only on the consumer repos:
 An **ungoverned** project (no `.spec-arch-domain.yml`, no per-repo config) produces
 exactly the same output as before — these are purely additive reads.
 
-### Verify + finish (deterministic gate, then render)
+### Verify + finish (deterministic gates, then render)
 
-Re-run the same command **with `--out`**:
+Once the melded `architecture_model.json` + `document_model.json` are in the work dir, re-run **with
+`--out`**:
 
 ```
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    synthesis.workspace.json --work .synthesis-portal --out site/ [--theme theme.json]
+    --from . --work .synthesis-portal --out site/ [--theme theme.json]
 ```
 
-It finishes only when every active member has a `document_model.json`; otherwise
-it reprints the brief and names what's missing. On finish it runs the fail-closed
-**`verify_links.py`** gate (ENDPOINTS_RESOLVE · EVIDENCE_PRESENT ·
-EVIDENCE_GROUNDED) over the link graph and every member corpus. Non-zero ⇒ **stop
-and fix** the flagged edges — never bypass. On pass it renders the portal: each
-member's page, the coverage-honest `atlas.html`, and `index.html`. **Drill-to-source
-(spec 003):** every member's cited spec/ADR files are rendered as bundled, beautified pages
-under `sources/<origin>/`, and every citation chip — same-repo *or cross-repo* — drills into
-the **actual source content of its owning repo** (content copied into the HTML). The atlas
-remains the repo-to-repo navigation map. All pages share the single editorial design system —
-there is no second visual system.
+It finishes only when the melded pair exists; otherwise it reprints the brief. On finish it runs BOTH
+fail-closed gates — **`verify_links.py`** over the link graph + corpora, and **`verify.py`** over the
+melded `document_model` against the **merged corpus** (every claim resolves, or it doesn't ship).
+Non-zero ⇒ **stop and fix the model** — never bypass. On pass it renders:
+
+- **`index.html`** — the single melded capability story (per-tier disclosures, build-status fading,
+  human-titled source tables, nested nav);
+- **`catalog.html`** — the hierarchical source index (repo › feature › artifacts), replacing the old
+  edge-list atlas;
+- **`sources/<origin>/…`** — drill-to-source pages; every citation chip drills into the **actual
+  source content of its owning repo** (content copied into the HTML), across repos.
+
+All pages share the one editorial design system — there is no second visual system, and there are no
+per-repository storybooks.
 
 ## What atlas is NOT
 

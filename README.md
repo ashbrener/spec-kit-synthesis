@@ -151,10 +151,11 @@ uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize.py" p
 ### Many repos → one portal (`/speckit.synthesis.atlas`)
 
 When the story spans repositories — a docs repo, the spec-kit specs behind it, the backend/frontend
-that implement it — atlas federates them into one static portal: **a faithful plain-English storybook
-per repo, plus a verified `docs↔specs↔code` traceability atlas.** Each page is built by the exact
-same engine as a single repo; the portal layer is purely additive and never touches per-page
-reasoning.
+that implement it — atlas weaves them into **ONE melded, capability-organized story**. Sections are
+capabilities (e.g. "Authentication"), each woven across the tiers: a plain-English functional
+narrative from the source layer, then per-tier technical detail (backend, frontend), every claim
+drilling to its own repo. Built work renders solid; planned faded. The spine is a deterministic
+clustering over the verified cross-repo link graph (no external graph dependency).
 
 ```mermaid
 flowchart TD
@@ -163,31 +164,30 @@ flowchart TD
         B["backend<br/>(build)"]:::src
         F["frontend<br/>(build)"]:::src
     end
-    WS --> AT["atlas engine<br/>(storybook per repo)"]:::code
-    AT --> P1["docs.html"]:::out
-    AT --> P2["backend.html"]:::out
-    AT --> P3["frontend.html"]:::out
-    AT --> GR{"verify_links<br/>fail-closed"}:::code
-    GR -->|pass| ATL["atlas.html<br/>+ index.html"]:::out
+    WS --> MERGE["merge + cluster<br/>(capabilities)"]:::code
+    MERGE --> REASON["agent reasons<br/>ONE melded story"]:::agent
+    REASON --> GR{"verify + verify_links<br/>fail-closed"}:::code
+    GR -->|pass| OUT["index.html (the story)<br/>+ catalog.html (source index)<br/>+ sources/"]:::out
     classDef src fill:#f3efe4,stroke:#b3471d,color:#17150f
     classDef code fill:#e2ece7,stroke:#1f5048,color:#17150f
+    classDef agent fill:#f6e6da,stroke:#b3471d,color:#17150f
     classDef out fill:#efe4f0,stroke:#6a3a6f,color:#17150f
 ```
 
 ```bash
 SYN=.specify/extensions/synthesis
-# 1. adapt every member → per-member hand-off brief (agent reasons each member's IR)
+# 1. adapt + merge + cluster → the capability spine + hand-off brief (agent reasons ONE melded story)
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    synthesis.workspace.json --work .synthesis-portal
-# 2. verify cross-repo links (fail-closed) + render the whole site
+    --from . --work .synthesis-portal
+# 2. verify (links + meld) fail-closed + render the single melded page + source index + sources
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    synthesis.workspace.json --work .synthesis-portal --out site/
+    --from . --work .synthesis-portal --out site/
 ```
 
-`site/` is self-contained — `index.html` (book-of-books), one page per repo, and `atlas.html` (the
-verified graph). Cross-repo links are **fail-closed**: an edge ships only with real evidence
-(declared, a shared qualified identifier, or a literal prose quote). See
-[`commands/atlas.md`](commands/atlas.md) for the manifest format and the full algorithm.
+`site/` is self-contained — `index.html` (the melded story), `catalog.html` (the hierarchical source
+index: repo › feature › artifacts), and `sources/` (drill-to-source). Cross-repo links and every
+claim are **fail-closed**: nothing ships without real, resolving evidence. See
+[`commands/atlas.md`](commands/atlas.md) for the full algorithm.
 
 ### Governed workspaces: one command, no manifest
 

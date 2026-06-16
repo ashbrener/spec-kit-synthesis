@@ -31,6 +31,7 @@ import hashlib
 import html
 import json
 import math
+import re
 import sys
 from contextvars import ContextVar
 from pathlib import Path
@@ -409,9 +410,41 @@ _STATIC_CSS = """
 """
 
 
+# Melded SITE layer (spec 006): per-tier disclosures, build-status badges + fading, human-titled
+# source tables, nested nav. Appended to the static CSS; uses the same design tokens.
+_MELD_CSS = """
+  /* build-status badges */
+  .bstatus{ display:inline-block; font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em;
+    text-transform:uppercase; font-weight:600; padding:2px 7px; border-radius:10px; vertical-align:middle;
+    margin-left:10px; }
+  h2 .bstatus{ margin-left:14px; }
+  .bs-built{ background:#dce8d6; color:#37502f; }
+  .bs-partial{ background:#efe3c4; color:#6e5413; }
+  .bs-planned{ background:#e7ded0; color:#7a5a2e; }
+  /* planned content reads as not-yet-built: faded, with a left rule. Print/forced-colors safe. */
+  .planned{ opacity:.62; }
+  details.tier-mod.planned{ opacity:1; }
+  details.tier-mod.planned > .body{ opacity:.6; border-left:2px dashed var(--line-dk); padding-left:14px; }
+  section.planned > h2{ opacity:.8; }
+  @media print{ .planned, details.tier-mod.planned > .body{ opacity:1 !important; } }
+  /* per-tier disclosure label */
+  details.tier-mod > summary .mt{ font-family:var(--font-display); }
+  /* human-titled source table */
+  .srctbl-wrap{ margin:22px 0 4px; }
+  .srctbl{ width:100%; }
+  .srctbl th{ font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#7d705a; }
+  .srctbl td{ font-size:.92rem; }
+  .srctbl .srcgo{ font-family:var(--font-mono); font-size:12px; color:var(--gold); text-decoration:none; white-space:nowrap; }
+  /* nested nav */
+  nav.toc .toc-tier{ display:block; font-family:var(--font-mono); font-size:11px; color:#7d705a;
+    padding:2px 0 2px 16px; text-decoration:none; }
+  nav.toc .toc-tier:hover{ color:var(--gold); }
+"""
+
+
 def build_css(theme: dict[str, str]) -> str:
     root = ":root{\n" + _theme_vars(theme) + "\n  --ease: cubic-bezier(.22,.61,.36,1);\n}\n"
-    return _FONT_IMPORT + root + _STATIC_CSS
+    return _FONT_IMPORT + root + _STATIC_CSS + _MELD_CSS
 
 
 # ────────────────────────── diagram → SVG layout ────────────────────────────
@@ -766,6 +799,81 @@ def _layout_timeline(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
     return "".join(parts), width, height
 
 
+def _layout_sequence(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """A cross-tier request path (spec 006): participants as lifeline columns; ordered messages
+    draw top→bottom in sequence (e.g. client → API → database)."""
+    nodes = graph.nodes
+    n = len(nodes)
+    if n == 0:
+        return _markers(fig_id), 1000, 120
+    ids = {nd.id for nd in nodes}
+    msgs = [e for e in graph.edges if e.src in ids and e.dst in ids and e.src != e.dst]
+    width, margin_x, head_y, head_h, step = 1000, 60, 20, 42, 52
+    colw = (width - 2 * margin_x) / max(1, n)
+    colx = {nd.id: margin_x + i * colw + colw / 2 for i, nd in enumerate(nodes)}
+    bottom = head_y + head_h + (len(msgs) + 1) * step
+    height = bottom + 36
+    parts = [_markers(fig_id)]
+    for i, nd in enumerate(nodes):
+        cx = colx[nd.id]
+        parts.append(_node_group_open(nd, f"anim {_ai(i)}"))
+        parts.append(_rect(cx - colw / 2 + 12, head_y, colw - 24, head_h, 10))
+        parts.append(_svg_text(cx, head_y + head_h / 2 + 4, "tm", 12, nd.label, anchor="middle"))
+        parts.append("</g>")
+        parts.append(f'<line x1="{cx:g}" y1="{head_y + head_h:g}" x2="{cx:g}" y2="{bottom:g}" '
+                     f'stroke="{_DLINE}" stroke-dasharray="4 5"/>')
+    for j, e in enumerate(msgs):
+        y = head_y + head_h + (j + 1) * step
+        x1, x2 = colx[e.src], colx[e.dst]
+        parts.append(f'<g class="anim {_ai(j)}">')
+        parts.append(_svg_text(margin_x - 18, y + 3, "tlab", 9, str(j + 1)))
+        parts.append(_edge_path(f"M{x1:g} {y:g} H {x2:g}", fig_id, e.emphasis))
+        if e.label:
+            parts.append(_svg_text((x1 + x2) / 2, y - 8, "tlab", 9, e.label, anchor="middle"))
+        parts.append("</g>")
+    return "".join(parts), width, height
+
+
+def _layout_erd(graph: DiagramGraph, fig_id: str) -> tuple[str, int, int]:
+    """A data model (spec 006): entities as boxes in a grid; relationships as labeled connectors.
+    Entities fade in staggered; relations draw after."""
+    nodes = graph.nodes
+    n = len(nodes)
+    if n == 0:
+        return _markers(fig_id), 1000, 120
+    width = 1000
+    cols = min(n, 3)
+    rows = math.ceil(n / cols)
+    bw, bh, gx, gy, top = 230, 72, 70, 54, 30
+    margin_x = (width - (cols * bw + (cols - 1) * gx)) / 2
+    height = top + rows * bh + max(0, rows - 1) * gy + 36
+    centre: dict[str, tuple[float, float]] = {}
+    parts = [_markers(fig_id)]
+    for i, nd in enumerate(nodes):
+        r, c = divmod(i, cols)
+        x = margin_x + c * (bw + gx)
+        y = top + r * (bh + gy)
+        centre[nd.id] = (x + bw / 2, y + bh / 2)
+        parts.append(_node_group_open(nd, f"anim {_ai(i)}"))
+        parts.append(_rect(x, y, bw, bh, 8))
+        parts.append(_svg_text(x + bw / 2, y + 24, "tm", 12, nd.label, anchor="middle"))
+        parts.append(f'<line x1="{x:g}" y1="{y + 34:g}" x2="{x + bw:g}" y2="{y + 34:g}" stroke="{_DLINE}"/>')
+        if nd.caption:
+            parts.append(_svg_text(x + bw / 2, y + 54, "tlab", 9, nd.caption[:30], anchor="middle"))
+        parts.append("</g>")
+    for j, e in enumerate(graph.edges):
+        if e.src not in centre or e.dst not in centre:
+            continue
+        sx, sy = centre[e.src]
+        dx, dy = centre[e.dst]
+        parts.append(f'<g class="anim {_ai(j)}">')
+        parts.append(_edge_path(f"M{sx:g} {sy:g} L {dx:g} {dy:g}", fig_id, e.emphasis))
+        if e.label:
+            parts.append(_svg_text((sx + dx) / 2, (sy + dy) / 2 - 6, "tlab", 9, e.label, anchor="middle"))
+        parts.append("</g>")
+    return "".join(parts), width, height
+
+
 # Registry of hand-laid diagram layouts. Unknown layouts fall back to `flow`.
 _LAYOUTS = {
     "pipeline": _layout_pipeline,
@@ -776,6 +884,8 @@ _LAYOUTS = {
     "hub": _layout_hub,
     "stack": _layout_stack,
     "timeline": _layout_timeline,
+    "sequence": _layout_sequence,
+    "erd": _layout_erd,
 }
 
 
@@ -818,6 +928,12 @@ def _ref_anchor(ref: SourceRef) -> str:
 # a SourceRef -> href|None callable. Held in a context var so chip rendering needs no signature
 # threading and stays reentrancy-safe.
 _RESOLVE: ContextVar = ContextVar("synthesis_resolve", default=None)
+
+# Optional human-title map injected by the melded portal (spec 006): locator -> SourceTitle
+# ({title, artifact_kind, repo}). When present, per-section sources render as a human-titled TABLE
+# instead of bare filename chips. Absent (e.g. the single-repo storybook), sources fall back to the
+# chip line unchanged.
+_TITLES: ContextVar = ContextVar("synthesis_titles", default=None)
 
 
 def _resolve_ref_href(ref: SourceRef) -> str:
@@ -929,29 +1045,89 @@ def _source_line(refs: list[SourceRef]) -> str:
     return '<div class="srcline">' + "".join(chips) + "</div>"
 
 
+def _source_table(refs: list[SourceRef]) -> str:
+    """Human-titled sources TABLE (melded portal, spec 006). Falls back to the chip line when no
+    title map is injected (the single-repo storybook), keeping that output unchanged."""
+    titles = _TITLES.get()
+    if not titles:
+        return _source_line(refs)
+    rows = ['<table class="tbl srctbl"><thead><tr><th>Source</th><th>Artifact</th><th>Repo</th><th></th></tr></thead><tbody>']
+    for r in refs:
+        st = titles.get(r.locator)
+        title = st.title if st else r.name
+        kind = (st.artifact_kind if st else r.type.value)
+        repo = (st.repo if st else (r.origin or "—"))
+        href = _resolve_ref_href(r) or "#refs"
+        t = SOURCE_T.get(r.type, "doc")
+        rows.append(
+            f"<tr><td>{esc(title)}</td>"
+            f'<td><span class="cite-t {t}">{esc(kind)}</span></td>'
+            f"<td>{esc(repo)}</td>"
+            f'<td><a class="srcgo" href="{href}">view &rarr;</a></td></tr>'
+        )
+    rows.append("</tbody></table>")
+    return '<div class="srctbl-wrap"><span class="srclab">Sources</span><div class="tbl-scroll">' + "".join(rows) + "</div></div>"
+
+
+_TIER_LABELS = {"backend": "Backend", "frontend": "Frontend", "docs": "Docs"}
+
+
+def _tier_label(tier: Optional[str]) -> str:
+    if not tier:
+        return "Technical detail"
+    return _TIER_LABELS.get(tier.lower(), tier[:1].upper() + tier[1:])
+
+
+_STATUS_LABEL = {"built": "Built", "partial": "Partial", "planned": "Planned"}
+
+
+def _status_badge(status: Optional[str]) -> str:
+    if not status:
+        return ""
+    label = _STATUS_LABEL.get(status, status)
+    return f'<span class="bstatus bs-{esc(status)}">{esc(label)}</span>'
+
+
 def _render_section(section: Section, fig_counter: list[int]) -> str:
-    parts = [f'<section id="{esc(section.id)}">', '<span class="anchor"></span>']
+    sclass = f' class="planned"' if section.build_status == "planned" else ""
+    parts = [f'<section id="{esc(section.id)}"{sclass}>', '<span class="anchor"></span>']
     strap = f" — {esc(section.strap)}" if section.strap else ""
     parts.append(f'<span class="sec-num">{section.number:02d}{strap}</span>')
-    parts.append(f"<h2>{esc(section.title)}</h2>")
+    parts.append(f"<h2>{esc(section.title)}{_status_badge(section.build_status)}</h2>")
     if section.subtitle:
         parts.append(f'<p class="lead">{esc(section.subtitle)}</p>')
-    technical: list[Block] = []
+    # functional (inline) vs technical (grouped by tier into per-tier disclosures)
+    tier_groups: list[tuple[Optional[str], list[Block]]] = []
+    tier_index: dict[Optional[str], int] = {}
     for block in section.blocks:
         if block.altitude is Altitude.TECHNICAL:
-            technical.append(block)
+            key = block.tier
+            if key not in tier_index:
+                tier_index[key] = len(tier_groups)
+                tier_groups.append((key, []))
+            tier_groups[tier_index[key]][1].append(block)
         else:
             parts.append(_render_block_core(block, fig_counter))
-    if technical:
-        parts.append(f'<details class="mod" id="{esc(section.id)}-tech">')
-        parts.append('<summary><span class="mt">Technical detail</span><span class="mx">+</span></summary>')
+    for i, (tier, blocks) in enumerate(tier_groups):
+        # a tier's grade: the strongest 'planned' signal among its blocks, else None
+        statuses = {b.build_status for b in blocks if b.build_status}
+        grade = ("planned" if "planned" in statuses else
+                 "partial" if "partial" in statuses else
+                 "built" if "built" in statuses else None)
+        faded = " planned" if grade == "planned" else ""
+        slug = re.sub(r"[^a-z0-9]+", "-", (tier or "tech").lower()).strip("-")
+        # legacy single-repo output (tier=None, no grade) stays byte-identical: class is exactly "mod".
+        mod_class = "mod" + (" tier-mod" if tier else "") + faded
+        parts.append(f'<details class="{mod_class}" id="{esc(section.id)}-{esc(slug)}">')
+        parts.append(f'<summary><span class="mt">{esc(_tier_label(tier))}</span>'
+                     f'{_status_badge(grade)}<span class="mx">+</span></summary>')
         parts.append('<div class="body">')
-        for block in technical:
+        for block in blocks:
             parts.append(_render_block_core(block, fig_counter))
         parts.append("</div></details>")
     refs = _collect_section_refs(section)
     if refs:
-        parts.append(_source_line(refs))
+        parts.append(_source_table(refs))
     parts.append("</section>")
     return "".join(parts)
 
@@ -978,8 +1154,28 @@ def _all_refs(doc: DocumentModel) -> list[SourceRef]:
     return ordered
 
 
-def _render_nav(sections: list[Section], project: str) -> str:
-    links = "".join(f'<a href="#{esc(s.id)}">{esc(s.title)}</a>' for s in sections)
+def _section_tiers(section: Section) -> list[Optional[str]]:
+    """The distinct technical tiers in a section, first-appearance order (for the nested nav)."""
+    seen: list[Optional[str]] = []
+    for b in section.blocks:
+        if b.altitude is Altitude.TECHNICAL and b.tier not in seen:
+            seen.append(b.tier)
+    return seen
+
+
+def _render_nav(sections: list[Section], project: str, catalog_href: Optional[str] = None) -> str:
+    # nested: each capability links to its section + its tier disclosures (spec 006)
+    chunks: list[str] = []
+    for s in sections:
+        chunks.append(f'<a href="#{esc(s.id)}">{esc(s.title)}</a>')
+        for tier in _section_tiers(s):
+            if tier is None:
+                continue   # single-repo storybook keeps a flat nav (no generic 'Technical detail' sub-link)
+            slug = re.sub(r"[^a-z0-9]+", "-", tier.lower()).strip("-")
+            chunks.append(f'<a class="toc-tier" href="#{esc(s.id)}-{esc(slug)}">{esc(_tier_label(tier))}</a>')
+    if catalog_href:
+        chunks.append(f'<a class="toc-catalog" href="{esc(catalog_href)}">Source index &rarr;</a>')
+    links = "".join(chunks)
     cur = esc(sections[0].title) if sections else "Contents"
     return (
         '<nav class="toc" id="toc"><div class="wrap">'
@@ -1090,20 +1286,25 @@ JS = r"""(function(){
 })();"""
 
 
-def render(doc: DocumentModel, theme: dict[str, str], resolve=None) -> str:
+def render(doc: DocumentModel, theme: dict[str, str], resolve=None, titles=None, catalog_href=None) -> str:
     """Pure: DocumentModel + theme tokens → a complete HTML document string.
 
     `resolve` (optional, portal Phase E): a SourceRef -> href|None callable to drill a citation
     chip ACROSS pages; absent or unmatched, chips resolve to the in-page References appendix.
+    `titles` (optional, melded portal spec 006): a locator -> SourceTitle map; when present, per-section
+    sources render as a human-titled table.
+    `catalog_href` (optional, spec 006): href of the hierarchical source index, linked from the nav.
     Deterministic for fixed inputs."""
     token = _RESOLVE.set(resolve)
+    ttoken = _TITLES.set(titles)
     try:
-        return _render_doc(doc, theme)
+        return _render_doc(doc, theme, catalog_href=catalog_href)
     finally:
         _RESOLVE.reset(token)
+        _TITLES.reset(ttoken)
 
 
-def _render_doc(doc: DocumentModel, theme: dict[str, str]) -> str:
+def _render_doc(doc: DocumentModel, theme: dict[str, str], catalog_href=None) -> str:
     merged = {**DEFAULT_THEME, **theme}
     css = build_css(merged)
     project = doc.project_name or doc.title
@@ -1142,7 +1343,7 @@ def _render_doc(doc: DocumentModel, theme: dict[str, str]) -> str:
         "<body>\n"
         '<div class="grain"></div>\n'
         f"{masthead}\n"
-        f"{_render_nav(doc.sections, project)}\n"
+        f"{_render_nav(doc.sections, project, catalog_href)}\n"
         '<div class="wrap">\n'
         f"{sections_html}\n"
         "</div>\n"

@@ -50,7 +50,7 @@ provides:
     # A workspace of repos → a documentation portal + verified traceability atlas.
     - name: "speckit.synthesis.atlas"
       file: "commands/atlas.md"
-      description: "A workspace of repos → a documentation portal (a storybook per repo) + a verified docs↔specs↔code traceability atlas. On a governed workspace it auto-scaffolds from the governance contracts: one command, no manifest."
+      description: "A workspace of repos → ONE melded, capability-organized architecture story (woven across tiers, built/planned-aware) + a hierarchical source index. On a governed workspace it auto-scaffolds: one command, no manifest."
 
 tags:
   - "documentation"

@@ -42,11 +42,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import adapter_code  # noqa: E402
 import adapter_doc  # noqa: E402
 import adapter_speckit  # noqa: E402
+import build_status as build_status_mod  # noqa: E402
+import cluster  # noqa: E402
 import discover_links  # noqa: E402
 import gov_config  # noqa: E402
 import render as render_mod  # noqa: E402
 import render_sources  # noqa: E402
 import scaffold  # noqa: E402
+import source_index  # noqa: E402
+import verify  # noqa: E402
 import verify_links  # noqa: E402
 from render import GLYPH, build_css, esc  # noqa: E402
 from schema import (DocumentModel, FragmentCorpus, LinkEvidenceKind, LinkGraph,  # noqa: E402
@@ -387,6 +391,54 @@ def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | No
     return site
 
 
+# ───────────────────────── melded SITE layer (spec 006) ─────────────────────
+# The portal is ONE capability-organized story (not a book-of-books). The agent reasons ONE melded
+# pair (architecture_model + document_model) over the MERGED workspace corpus, organized by the
+# deterministic capability clusters; the page engine renders it with per-tier disclosures, build-status
+# fading, human-titled source tables, and drill-to-source. The old build_site/render_atlas/render_index
+# remain as (unit-tested) library functions but are no longer the portal's output.
+
+MELD_HAND_OFF = """\
+─────────────────────────────────────────────────────────────────────────────
+ STAGE 0 COMPLETE — adapted the workspace; merged corpus + {n} capability cluster(s) in {work}
+{members}
+ NEXT: reason ONE MELDED story over the MERGED corpus, organized by capability (NOT per repo):
+   {work}/architecture_model.json   (reconcile, across repos)
+   {work}/document_model.json        (compose: one Section per capability)
+
+ Use the clusters in {work}/clusters.json as the section spine. Per capability: a plain-English
+ FUNCTIONAL narrative (tier unset) from the source layer, then per-tier TECHNICAL blocks tagged
+ `tier` (e.g. "backend"/"frontend") + `build_status` (built/partial/planned); be diagram-forward.
+ Cite the merged corpus (verify.py gate); every claim drills to its owning repo.
+
+ THEN re-run this command with --out <dir> to verify + render the single melded page + sources.
+─────────────────────────────────────────────────────────────────────────────
+"""
+
+
+def build_meld_site(meld_doc: DocumentModel, corpora: dict, title_map: dict,
+                    theme: dict | None = None) -> dict:
+    """Pure: the melded DocumentModel + per-origin corpora + human-title map → {filename: html}.
+
+    One `index.html` (the melded story) + bundled drill-to-source pages under `sources/<origin>/`.
+    Citations drill into the owning repo's source content (any related repo); the title map renders
+    human-titled source tables. No per-member storybooks, no edge-list atlas."""
+    merged_theme = theme or {}
+    source_resolver = render_sources.build_workspace_source_resolver(corpora) if corpora else None
+    site: dict[str, str] = {}
+    site["index.html"] = render_mod.render(meld_doc, merged_theme, resolve=source_resolver,
+                                           titles=title_map, catalog_href="catalog.html")
+    # the hierarchical source index (tree) replaces the edge-list atlas (spec 006)
+    tree = source_index.build_tree(corpora)
+    site["catalog.html"] = source_index.render_index_tree(tree, merged_theme, story_href="index.html")
+    for origin, corpus in corpora.items():
+        pages = render_sources.render_source_pages(
+            corpus, merged_theme, back_href="../../index.html", project=origin)
+        for name, html_out in pages.items():
+            site[f"sources/{origin}/{name}"] = html_out
+    return site
+
+
 # ────────────────────────────────── CLI ─────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> int:
@@ -509,25 +561,59 @@ def main(argv: list[str] | None = None) -> int:
           "(declared + shared-identifier; prose edges added by the agent).")
 
     active = [m for m in manifest.members if m.origin not in skipped]
-    missing = [m.origin for m in active if m.origin not in ready]
+    active_origins = [m.origin for m in active]
+    active_corpora = {o: corpora[o] for o in active_origins}
 
-    # ── scaffold path: some member still needs its IR ──────────────────────
-    if missing or not args.out:
-        print(ATLAS_HAND_OFF.format(n=len(manifest.members), work=work, members="\n".join(lines) + "\n"))
-        if args.out and missing:
-            print(f"synthesize_atlas: --out given but {len(missing)} member(s) lack document_model.json: "
-                  f"{', '.join(missing)} — produce them (brief above), then re-run.", file=sys.stderr)
+    # ── meld stage 0: merge corpora, cluster into capabilities, human titles, briefs (spec 006) ──
+    merged = FragmentCorpus(
+        project_name=(manifest.project_name or manifest.title or "Workspace"),
+        fragments=[f for o in active_origins for f in active_corpora[o].fragments],
+    )
+    (work / "merged_corpus.json").write_text(merged.model_dump_json(indent=2), encoding="utf-8")
+    source_origins = {rm.origin for rm in topology.members if rm.domain_role == "source"}
+    source_origins |= {m.origin for m in active if m.role == "docs"}
+    clusters = cluster.build_clusters(active_corpora, link_graph, source_origins)
+    (work / "clusters.json").write_text(clusters.model_dump_json(indent=2), encoding="utf-8")
+    title_map = source_index.build_title_map(active_corpora)
+    (work / "title_map.json").write_text(
+        json.dumps({k: v.model_dump() for k, v in title_map.items()}, indent=2), encoding="utf-8")
+    # deterministic per-capability build status (coverage + lifecycle) for the agent's briefs (spec 006 US2)
+    statuses = [build_status_mod.grade(c, active_corpora) for c in clusters.clusters]
+    (work / "build_status.json").write_text(
+        json.dumps([s.model_dump() for s in statuses], indent=2), encoding="utf-8")
+    print(f"synthesize_atlas: merged corpus ({len(merged.fragments)} fragments); "
+          f"{len(clusters.clusters)} capability cluster(s), {len(clusters.unclustered)} unclustered.")
+
+    # The agent writes ONE melded pair over the merged corpus (verify.py gates it).
+    arch_path = work / "architecture_model.json"
+    meld_path = work / "document_model.json"
+    have_meld = arch_path.exists() and meld_path.exists()
+
+    # ── hand-off path: the melded IR isn't ready (or no --out) ──────────────
+    if not have_meld or not args.out:
+        print(MELD_HAND_OFF.format(n=len(clusters.clusters), work=work, members="\n".join(lines) + "\n"))
+        if args.out and not have_meld:
+            print("synthesize_atlas: --out given but the melded architecture_model.json + "
+                  "document_model.json are not in the work dir yet — reason them (brief above), then re-run.",
+                  file=sys.stderr)
         return 0
 
-    # ── finish path: fail-closed link gate, then render pages + atlas + index ──
-    corpus_paths = [str(work / _slug(m.origin) / "corpus.json") for m in active]
+    # ── finish path: fail-closed gates (links + meld), then render ONE story + sources ──
+    corpus_paths = [str(work / _slug(o) / "corpus.json") for o in active_origins]
     vrc = verify_links.main([str(work / "link_graph.json"), *corpus_paths])
     if vrc != 0:
         print("synthesize_atlas: LINK VERIFY FAILED (fail-closed) — fix the flagged edges, do not bypass.",
               file=sys.stderr)
         return vrc
-    active_manifest = manifest.model_copy(update={"members": active})
-    site = build_site(active_manifest, ready, corpora, link_graph, theme)
+    vrc = verify.main([str(meld_path), str(arch_path), str(work / "merged_corpus.json")])
+    if vrc != 0:
+        print("synthesize_atlas: MELD VERIFY FAILED (fail-closed) — fix the melded model, do not bypass.",
+              file=sys.stderr)
+        return vrc
+
+    meld_doc = DocumentModel.model_validate_json(meld_path.read_text(encoding="utf-8"))
+    merged_theme = {**(manifest.theme or {}), **(theme or {})}
+    site = build_meld_site(meld_doc, active_corpora, title_map, merged_theme)
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
     for fn, html_out in site.items():
@@ -535,8 +621,8 @@ def main(argv: list[str] | None = None) -> int:
         dest.parent.mkdir(parents=True, exist_ok=True)   # nested sources/<origin>/ dirs
         dest.write_text(html_out, encoding="utf-8")
     n_src = sum(1 for fn in site if fn.startswith("sources/"))
-    print(f"synthesize_atlas: ✓ portal written to {outdir} ({len(site) - n_src} pages + {n_src} source page(s); "
-          "every citation drills into sources/)")
+    print(f"synthesize_atlas: ✓ melded story written to {outdir} "
+          f"({len(site) - n_src} page(s) + {n_src} source page(s); every claim drills to its source).")
     return 0
 
 
