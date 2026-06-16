@@ -48,11 +48,22 @@ DEFAULT_EXTS = {".md", ".markdown"}
 SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build"}
 
 
-def _is_skipped(rel_parts, extra: set[str] = frozenset()) -> bool:
+def _is_skipped(rel: str, extra=frozenset()) -> bool:
     """Skip any path with a HIDDEN part (.git, .venv, .specify, .project-arc, .claude, … — all
-    dot-dirs) or a part in SKIP_DIRS / the caller's extra excludes. Keeps vendored extension
-    runtimes, their tests/fixtures, and tooling trees out of the product corpus."""
-    return any(part.startswith(".") or part in SKIP_DIRS or part in extra for part in rel_parts)
+    dot-dirs) or a part in SKIP_DIRS, plus the caller's `extra` excludes. An `extra` entry containing
+    `/` is a PATH-PREFIX (skip exactly that subtree, spec 007); a bare name matches a path part. Lets a
+    source repo's narrative pass skip its specs_dir/adr_dir subtrees (no double-ingest)."""
+    parts = rel.split("/")
+    if any(part.startswith(".") or part in SKIP_DIRS for part in parts):
+        return True
+    for e in extra:
+        if "/" in e:
+            e = e.rstrip("/")
+            if rel == e or rel.startswith(e + "/"):
+                return True
+        elif e in parts:
+            return True
+    return False
 
 # ── ADR detection (deterministic, path-based) ───────────────────────────────
 # A doc is an ADR if any path part names an ADR location, or the filename is an
@@ -240,7 +251,7 @@ def build_corpus(
         for p in sorted(root.rglob("*")):
             if not p.is_file():
                 continue
-            if _is_skipped(p.relative_to(root).parts, exclude):
+            if _is_skipped(p.relative_to(root).as_posix(), exclude):
                 continue
             if p.suffix.lower() in exts:
                 files.append(p)

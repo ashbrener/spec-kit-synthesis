@@ -72,12 +72,17 @@ def test_derived_members_carry_declared_namespace_and_locator():
     assert by["web"].namespace == "WEB" and by["web"].domain_role == "standalone"
 
 
-def test_source_member_ingests_one_doc_pass_build_member_specs_plus_adrs():
+def test_source_member_structure_aware_ingestion():
+    # spec 007: a source repo is read structure-aware — speckit(specs) + doc(adr) + doc(narrative,
+    # excluding the specs/adr subtrees) — not one doc-lumped pass.
     manifest, _ = _derive()
     by = {m.origin: m for m in manifest.members}
-    # source → a single doc pass over the repo
-    assert [s.adapter for s in by["core"].sources] == ["doc"]
-    # build (api) → structure-aware specs + an ADR doc pass
+    core = by["core"].sources
+    assert [s.adapter for s in core] == ["speckit", "doc", "doc"]
+    # the narrative (final) doc pass excludes the specs + adr subtrees → no double-ingest
+    narrative = core[-1]
+    assert narrative.adapter == "doc" and set(narrative.exclude) == {"specs", "docs/adr"}
+    # build (api) → structure-aware specs + an ADR doc pass (unchanged)
     assert [s.adapter for s in by["api"].sources] == ["speckit", "doc"]
     # standalone (web) → specs only (no adr_dir declared)
     assert [s.adapter for s in by["web"].sources] == ["speckit"]

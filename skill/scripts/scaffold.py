@@ -120,9 +120,17 @@ def derive_manifest(authority, domain) -> tuple[WorkspaceManifest, ScaffoldRepor
         sources: list[IngestionSource] = []
         ingested: list[str] = []
         if dm.role == "source":
-            # one doc pass over the repo root: docs + specs-as-prose + ADRs (adr_dir forces ADR kind)
-            sources.append(IngestionSource(adapter="doc", path=loc, adr_dir=adr_dir))
-            ingested.append("docs + specs + ADRs (doc)")
+            # structure-aware (spec 007): specs read as features (speckit), ADRs as decisions (doc),
+            # and the remaining narrative via doc EXCLUDING specs/adr subtrees (no double-ingest).
+            if specs_dir:
+                sources.append(IngestionSource(adapter="speckit", path=_join(specs_dir)))
+                ingested.append(f"specs ({specs_dir}, speckit)")
+            if adr_dir:
+                sources.append(IngestionSource(adapter="doc", path=_join(adr_dir), adr_dir="."))
+                ingested.append(f"ADRs ({adr_dir}, doc)")
+            nar_exclude = [d for d in (specs_dir, adr_dir) if d]
+            sources.append(IngestionSource(adapter="doc", path=loc, exclude=nar_exclude))
+            ingested.append("narrative (doc, excl. specs/adr)")
         else:
             if specs_dir:
                 sources.append(IngestionSource(adapter="speckit", path=_join(specs_dir)))

@@ -1,0 +1,9 @@
+version: v1
+role: build
+namespace: API
+specs_dir: specs
+adr_dir: docs/adr
+sources:
+  - id: core
+    locator: ../core
+    role: source

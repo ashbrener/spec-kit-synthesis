@@ -8,6 +8,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Docs-authority capability signal** (spec 007) — a `source` repo (a docs repository with a
+  specs dir, an ADR dir, and narrative folders) is now ingested **structure-aware**: its specs via
+  the speckit adapter (distinct feature seeds), its ADRs as decisions, and its narrative via the doc
+  adapter **excluding** the specs/ADR subtrees (no double-ingest). So build specs and the source
+  specs they derive from finally **meld into shared capabilities** on a docs-authority workspace.
+  Clusters are classified **capability / decision / background**: cited decisions render inline in
+  their capability, uncited decisions gather in a Decisions appendix, narrative becomes an
+  Overview/Background section — none masquerade as capabilities. Adds a path-prefix `exclude` on an
+  ingestion source. No new signal or dependency; gates + build/standalone + ungoverned unchanged.
+
+### Changed (earlier in this cycle)
+
 - **The multi-repo portal is now ONE melded, capability-organized story** (spec 006), replacing the
   book-of-books. `speckit.synthesis.atlas` reasons a single document over the merged workspace corpus,
   organized by **capabilities** (deterministically clustered over the cross-repo link graph — no

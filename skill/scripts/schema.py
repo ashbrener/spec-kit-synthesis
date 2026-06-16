@@ -437,6 +437,7 @@ class IngestionSource(BaseModel):
     path: str = Field(..., description="Source path, relative to the workspace base (or absolute).")
     adr_dir: Optional[str] = Field(None, description="For the doc adapter: force ADR classification at/below this dir.")
     include: Optional[str] = Field(None, description="Optional extension override passed to the doc/code adapter.")
+    exclude: list[str] = Field(default_factory=list, description="Path-prefixes (with '/') or bare dir names this source skips, beyond the always-skipped hidden/tooling dirs (spec 007).")
 
 
 class WorkspaceMember(BaseModel):

@@ -171,7 +171,7 @@ def load_manifest(path) -> WorkspaceManifest:
     return WorkspaceManifest.model_validate(data)
 
 
-def _adapt_one(adapter_name, src, raw, project, *, adr_dir=None, include=None) -> FragmentCorpus:
+def _adapt_one(adapter_name, src, raw, project, *, adr_dir=None, include=None, exclude=None) -> FragmentCorpus:
     """Run one adapter over one source path → a (not-yet-origin-stamped) FragmentCorpus."""
     adapter = _ADAPTERS.get(adapter_name)
     if adapter is None:
@@ -181,6 +181,8 @@ def _adapt_one(adapter_name, src, raw, project, *, adr_dir=None, include=None) -
         argv += ["--adr-dir", str(adr_dir)]
     if include and adapter_name in ("doc", "code"):
         argv += ["--include", str(include)]
+    if exclude and adapter_name in ("doc", "code"):
+        argv += ["--exclude", ",".join(exclude)]
     rc = adapter.main(argv)
     if rc != 0:
         raise RuntimeError(f"{adapter_name} adapter failed over {src}")
@@ -204,7 +206,8 @@ def build_member_corpus(member, base, work) -> FragmentCorpus:
             if not src.exists():
                 continue  # a declared sub-source the repo doesn't actually have — ingest what exists
             raw = work / f"corpus-{_slug(member.origin)}-{i}-{s.adapter}-raw.json"
-            sub = _adapt_one(s.adapter, src, raw, member.origin, adr_dir=s.adr_dir, include=s.include)
+            sub = _adapt_one(s.adapter, src, raw, member.origin, adr_dir=s.adr_dir,
+                             include=s.include, exclude=s.exclude)
             merged.extend(sub.fragments)
         # de-dupe by fragment id (a doc free-form pass and an adr pass may both touch the adr dir)
         seen: set[str] = set()
