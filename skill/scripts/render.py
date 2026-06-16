@@ -83,6 +83,7 @@ SOURCE_T = {
     SourceType.SPEC: "spec",
     SourceType.CODE: "code",
     SourceType.DESIGN_DOC: "doc",
+    SourceType.ADR: "adr",
 }
 
 # CalloutKind → design-system note variant. decision=affirmative (green),
@@ -269,6 +270,7 @@ _STATIC_CSS = """
   .cite-t.spec{ background: var(--gold); }
   .cite-t.code{ background: var(--green); }
   .cite-t.doc{ background: var(--blue); }
+  .cite-t.adr{ background: var(--red); }
 
   /* diagram frames */
   figure{ margin: 34px 0; border: 1px solid var(--line-dk); border-radius: 6px; background: #fbf9f2; padding: 8px; box-shadow: 0 4px 20px var(--shadow); overflow: hidden; }
