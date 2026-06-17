@@ -104,3 +104,20 @@ def test_repo_config_absent_sources_is_empty():
     cfg = gc.read_repo_config(GOVERNED_WS / "core")
     assert cfg is not None
     assert cfg.sources == []
+
+
+# ── citation_keys (spec 008) ─────────────────────────────────────────────────
+
+def test_repo_config_parses_citation_keys(tmp_path):
+    (tmp_path / gc.GOV_CONFIG_FILENAME).write_text(
+        "namespace: API\nspecs_dir: specs\n"
+        "citation_keys:\n  source_specs: derives\n  adrs: decides\n", encoding="utf-8")
+    cfg = gc.read_repo_config(tmp_path)
+    assert cfg is not None
+    assert cfg.citation_keys == {"source_specs": "derives", "adrs": "decides"}
+
+
+def test_repo_config_citation_keys_default_empty(tmp_path):
+    (tmp_path / gc.GOV_CONFIG_FILENAME).write_text("namespace: API\n", encoding="utf-8")
+    cfg = gc.read_repo_config(tmp_path)
+    assert cfg is not None and cfg.citation_keys == {}

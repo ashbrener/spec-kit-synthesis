@@ -547,18 +547,19 @@ def main(argv: list[str] | None = None) -> int:
     # no behaviour change for an ungoverned project).
     declared_ns = {rm.origin: rm.namespace for rm in topology.members if rm.structure_evidence == "declared"}
     namespaces: dict[str, str | None] = {}
+    citation_keys: dict[str, dict[str, str]] = {}   # spec 008: per-member slot key overrides
     for m in manifest.members:
         if m.origin in skipped:
             continue
-        if declared_ns.get(m.origin):
-            namespaces[m.origin] = declared_ns[m.origin]
-            continue
         cfg = gov_config.find_repo_config((Path(base) / m.path), ceiling=base)
-        namespaces[m.origin] = cfg.namespace if cfg else None
+        namespaces[m.origin] = declared_ns.get(m.origin) or (cfg.namespace if cfg else None)
+        if cfg and cfg.citation_keys:
+            citation_keys[m.origin] = cfg.citation_keys
 
-    # cross-repo traceability graph (declared + deterministic shared-identifier + cites edges);
+    # cross-repo traceability graph: declared slots (spec 008) + manifest + shared-identifier + cites;
     # the in-session agent may add evidence-gated prose edges before the finish step (spec 002 Phase D).
-    link_graph = discover_links.build_link_graph(manifest, corpora, namespaces=namespaces)
+    link_graph = discover_links.build_link_graph(manifest, corpora, namespaces=namespaces,
+                                                 citation_keys=citation_keys)
     (work / "link_graph.json").write_text(link_graph.model_dump_json(indent=2), encoding="utf-8")
     print(f"synthesize_atlas: link_graph.json — {len(link_graph.edges)} cross-repo edge(s) "
           "(declared + shared-identifier; prose edges added by the agent).")

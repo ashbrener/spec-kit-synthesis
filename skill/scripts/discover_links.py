@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+import yaml
+
 from schema import (
     DeclaredLink,
     FragmentCorpus,
@@ -200,27 +202,155 @@ def declared_edges(manifest: WorkspaceManifest) -> list[LinkEdge]:
     ]
 
 
+# ───────────────── typed citation slots (spec 008, vocabulary.json@0.3.0) ────────────────
+# The reader recovers derived_from/cites edges DIRECTLY from the declared front-matter slots
+# instead of inferring them from prose. Grammar (citation_slots): derived_from in spec.md
+# front-matter (`<source-member-id>:<spec-feature-id>` cross-repo | `<spec-feature-id>` intra-repo);
+# cites in plan.md front-matter (qualified `<NS>-ADR-NNN` cross-repo | bare intra-repo). Slot key
+# names are configurable per repo (`citation_keys`), defaulting to derived_from / cites.
+
+_SLOT_DEFAULTS = {"source_specs": "derived_from", "adrs": "cites"}
+_FRONT_MATTER = re.compile(r"^\s*---\s*\n(.*?)\n---\s*(?:\n|$)", re.DOTALL)
+
+
+def _front_matter(text: str) -> dict:
+    m = _FRONT_MATTER.match(text or "")
+    if not m:
+        return {}
+    try:
+        data = yaml.safe_load(m.group(1))
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _bare_file(fid: str) -> str:
+    """'origin::001-auth/spec.md#x' → '001-auth/spec.md'."""
+    return fid.split("::", 1)[-1].split("#", 1)[0]
+
+
+def _as_list(v) -> list[str]:
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [str(x).strip() for x in v if str(x).strip()]
+    return [str(v).strip()] if str(v).strip() else []
+
+
+def discover_slot_edges(manifest: WorkspaceManifest, corpora: dict[str, FragmentCorpus],
+                        namespaces: dict[str, str | None] | None = None,
+                        citation_keys: dict[str, dict[str, str]] | None = None
+                        ) -> tuple[list[LinkEdge], list[str]]:
+    """Parse the governed citation slots and emit `declared`-tier typed edges (spec 008).
+
+    Returns (edges, unresolved): a slot value that does not resolve in the workspace mints NO edge
+    and is recorded in `unresolved` (fail-closed on gaps — never a fabricated edge)."""
+    namespaces = namespaces or {}
+    citation_keys = citation_keys or {}
+    origins = {m.origin for m in manifest.members}
+
+    # (origin, feature_key) → representative (min) fragment id — a stable derived_from target.
+    feat_rep: dict[tuple[str, str], str] = {}
+    for o in sorted(corpora):
+        for f in corpora[o].fragments:
+            if f.feature_key:
+                k = (o, f.feature_key)
+                cur = feat_rep.get(k)
+                feat_rep[k] = f.id if cur is None else min(cur, f.id)
+
+    # qualified ADR id → (origin, adr fragment locator) — the cites target index.
+    adr_index: dict[str, tuple[str, str]] = {}
+    for o in sorted(corpora):
+        for qid, by_kind in extract_adr_refs(corpora[o], namespaces.get(o)).items():
+            if "adr" in by_kind:
+                cand = (o, by_kind["adr"])
+                cur = adr_index.get(qid)
+                adr_index[qid] = cand if cur is None else min(cur, cand)
+
+    edges: list[LinkEdge] = []
+    unresolved: list[str] = []
+    for o in sorted(corpora):
+        keys = citation_keys.get(o, {})
+        df_key = keys.get("source_specs", _SLOT_DEFAULTS["source_specs"])
+        ct_key = keys.get("adrs", _SLOT_DEFAULTS["adrs"])
+        ns = namespaces.get(o)
+        done: set[str] = set()
+        for f in corpora[o].fragments:
+            file = _bare_file(f.id)
+            base = file.rsplit("/", 1)[-1]
+            if base not in ("spec.md", "plan.md") or file in done:
+                continue
+            fm = _front_matter(f.text)
+            if not fm:
+                continue
+            done.add(file)
+            if base == "spec.md":
+                for val in _as_list(fm.get(df_key)):
+                    member, _, feat = val.rpartition(":")  # 'a:b'→('a',':','b'); 'b'→('','','b')
+                    member = member or o                    # no colon → intra-repo
+                    rep = feat_rep.get((member, feat))
+                    if member not in origins or rep is None:
+                        unresolved.append(f"{o}:{file} derived_from {val!r} (unresolved)")
+                        continue
+                    edges.append(LinkEdge(src=_ep(o, f.id), dst=_ep(member, rep),
+                                          rel=LinkRel.DERIVED_FROM,
+                                          evidence_kind=LinkEvidenceKind.DECLARED, evidence=val))
+            else:  # plan.md → cites
+                for val in _as_list(fm.get(ct_key)):
+                    qid = qualify_adr(val, ns)
+                    target = adr_index.get(qid) if qid else None
+                    if target is None:
+                        unresolved.append(f"{o}:{file} cites {val!r} (unresolved)")
+                        continue
+                    a_origin, a_loc = target
+                    edges.append(LinkEdge(src=_ep(o, f.id), dst=_ep(a_origin, a_loc),
+                                          rel=LinkRel.CITES,
+                                          evidence_kind=LinkEvidenceKind.DECLARED, evidence=qid))
+    return edges, unresolved
+
+
 def _key(e: LinkEdge) -> tuple:
     return (e.src.origin, e.src.locator, e.dst.origin, e.dst.locator, e.rel.value)
 
 
 def build_link_graph(manifest: WorkspaceManifest, corpora: dict[str, FragmentCorpus],
                      prose_edges: list[LinkEdge] | None = None,
-                     namespaces: dict[str, str | None] | None = None) -> LinkGraph:
-    """Merge declared (trusted) + identifier + cites (deterministic) + prose (agent), deduped
+                     namespaces: dict[str, str | None] | None = None,
+                     citation_keys: dict[str, dict[str, str]] | None = None) -> LinkGraph:
+    """Merge declared-slot (spec 008) + declared-manifest + identifier + cites + prose, deduped
     by (src, dst, rel) preferring the most-trusted evidence first. Deterministic.
 
-    `namespaces` maps each member origin → its configured ADR namespace (from the repo's
-    `.spec-arch-governance.yml`), used to qualify bare `ADR-NNN` ids before citation discovery
-    (spec 004). Absent → bare ids stay repo-local and mint no cross-repo citation."""
+    `namespaces` maps each origin → its configured ADR namespace (spec 004). `citation_keys` maps
+    each origin → its configured slot key names (spec 008); slot edges are read from the governed
+    front-matter and merged FIRST so they win dedup. A lower-tier edge whose feature-pair+relation is
+    already covered by a declared slot edge is suppressed (slot wins over inferred), while distinct
+    same-tier edges (e.g. two different FR identifier edges) are preserved — clustering still sees
+    per-feature edges."""
+    slot_edges, _unresolved = discover_slot_edges(manifest, corpora, namespaces, citation_keys)
+
+    # locator → (origin, feature_key), for feature-pair suppression of inferred duplicates.
+    loc_feat: dict[str, tuple[str, str | None]] = {
+        f.id: (o, f.feature_key) for o in corpora for f in corpora[o].fragments}
+
+    def _featpair(e: LinkEdge) -> tuple:
+        s = loc_feat.get(e.src.locator, (e.src.origin, None))
+        d = loc_feat.get(e.dst.locator, (e.dst.origin, None))
+        return (s[0], s[1], d[0], d[1], e.rel.value)
+
+    declared_pairs = {_featpair(e) for e in slot_edges}
+
     seen: set[tuple] = set()
     merged: list[LinkEdge] = []
-    for e in [*declared_edges(manifest),
+    for e in [*slot_edges,
+              *declared_edges(manifest),
               *discover_identifier_edges(manifest, corpora),
               *discover_adr_edges(manifest, corpora, namespaces),
               *(prose_edges or [])]:
         k = _key(e)
         if k in seen:
+            continue
+        # a declared slot edge supersedes a lower-tier inferred edge for the same feature pair+rel
+        if e.evidence_kind is not LinkEvidenceKind.DECLARED and _featpair(e) in declared_pairs:
             continue
         seen.add(k)
         merged.append(e)
