@@ -39,8 +39,19 @@ def test_evidence_kind_matches_vendored_evidence():
 
 
 def test_pinned_vocabulary_version_is_expected():
-    # the pin is 0.2.0; bumping the vendored copy is a deliberate act, surfaced here.
-    assert _vocabulary()["version"] == "0.2.0"
+    # the pin is 0.3.0 (adds citation_slots); bumping the vendored copy is a deliberate act, surfaced here.
+    assert _vocabulary()["version"] == "0.3.0"
+
+
+def test_citation_slots_block_present_and_shaped():
+    # spec 008: synthesis reads the typed citation slots; pin their documented shape (ARCH-ADR-000 Amendment 2).
+    cs = _vocabulary()["citation_slots"]
+    assert cs["slots"]["derived_from"]["file"] == "spec.md"
+    assert cs["slots"]["cites"]["file"] == "plan.md"
+    assert cs["keys"]["config_field"] == "citation_keys"
+    assert cs["keys"]["defaults"] == {"source_specs": "derived_from", "adrs": "cites"}
+    assert ":" in cs["derived_from"]["example_cross_repo"]            # <source>:<feature>
+    assert cs["cites"]["example_cross_repo"].count("-ADR-") == 1      # qualified <NS>-ADR-NNN
 
 
 def test_domain_member_roles_match_vendored_schema():

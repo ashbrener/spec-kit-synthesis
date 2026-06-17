@@ -1,7 +1,7 @@
 {
   "id": "ARCH-ADR-000",
   "title": "The shared vocabulary",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "status": "accepted",
   "license": "MIT",
   "home": "spec-kit-arch-governance/docs/adr",
@@ -50,5 +50,32 @@
       "Accepted ADR bodies are immutable above an '## Amendments' heading.",
       "A decision change is a new ADR that supersedes the old."
     ]
+  },
+  "citation_slots": {
+    "description": "Where the typed citation slots live and how their values are written. Readers parse these to recover derived_from/cites edges directly, rather than inferring them from prose.",
+    "keys": {
+      "configurable": true,
+      "config_field": "citation_keys",
+      "defaults": { "source_specs": "derived_from", "adrs": "cites" }
+    },
+    "slots": {
+      "derived_from": { "file": "spec.md", "location": "YAML front-matter", "value": "list", "relation": "derived_from" },
+      "cites": { "file": "plan.md", "location": "YAML front-matter", "value": "list", "relation": "cites" }
+    },
+    "derived_from": {
+      "grammar": "<source-member-id>:<spec-feature-id> (cross-repo) | <spec-feature-id> (intra-repo)",
+      "discriminator": "a colon (':') marks a cross-repo reference; a value with no colon is intra-repo",
+      "source_member_id": "the domain-manifest member name (== the citing repo's sources[].id)",
+      "spec_feature_id": "the feature directory name under the source's specs_dir",
+      "example_cross_repo": "docs:002-architecture",
+      "example_intra_repo": "002-architecture"
+    },
+    "cites": {
+      "pattern": "^([A-Z][A-Z0-9]*-)?ADR-\\d{3,}$",
+      "cross_repo": "MUST be the fully-qualified <source-NS>-ADR-NNN",
+      "intra_repo": "MAY be bare ADR-NNN (interpreted under the citing repo's namespace)",
+      "example_cross_repo": "CORE-ADR-007",
+      "example_intra_repo": "ADR-007"
+    }
   }
 }

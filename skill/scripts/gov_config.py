@@ -58,6 +58,7 @@ class RepoConfig(BaseModel):
     adr_dir: Optional[str] = None
     specs_dir: Optional[str] = None
     sources: list[RepoSource] = []
+    citation_keys: dict[str, str] = {}   # spec 008: override the slot key names (source_specs/adrs); absent → contract defaults
 
 
 class DomainMember(BaseModel):

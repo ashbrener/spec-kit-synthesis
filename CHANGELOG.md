@@ -8,6 +8,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Reads the governed citation slots** (spec 008) — synthesis now recovers `derived_from`/`cites`
+  edges directly from the declared front-matter slots (vocabulary.json@0.3.0 `citation_slots`,
+  ARCH-ADR-000 Amendment 2), instead of only inferring them from shared prose. A build spec that
+  declares `derived_from: [docs:002-architecture]` in `spec.md` front-matter now melds with that
+  source feature **even when the slug never appears in the source's prose** (previously: no edge);
+  `cites: [<NS>-ADR-NNN]` in `plan.md` attaches the decision. Slot edges are graded `declared` (the
+  top evidence tier) and win dedup over inferred edges. Slot key names follow each repo's
+  `citation_keys`; an unresolved slot mints no edge (reported). Vendored contract re-pinned to 0.3.0
+  + drift-guarded. No new dependency; gates, single-repo, and no-slot workspaces unchanged.
+
 - **Docs-authority capability signal** (spec 007) — a `source` repo (a docs repository with a
   specs dir, an ADR dir, and narrative folders) is now ingested **structure-aware**: its specs via
   the speckit adapter (distinct feature seeds), its ADRs as decisions, and its narrative via the doc

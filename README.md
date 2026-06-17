@@ -247,7 +247,10 @@ Synthesis needs **no configuration file** — install and invoke. Two optional i
   [spec-kit-arch-governance](https://github.com/ashbrener/spec-kit-arch-governance) convention, atlas
   reads its published contracts *as a documented format* (no runtime dependency, read-only): a
   declared **`.spec-arch-domain.yml`** is the source-of-truth topology (members/roles/namespaces/
-  locators, graded `declared`); **typed citations** match the shared vocabulary (`cites` for a
+  locators, graded `declared`); **declared citation slots** are read directly from front-matter
+  (`derived_from: [<source>:<feature>]` in `spec.md`, `cites: [<NS>-ADR-NNN]` in `plan.md` —
+  vocabulary.json@0.3.0), so a build spec melds with its source feature from the *declaration*, not
+  from prose coincidence; **typed citations** match the shared vocabulary (`cites` for a
   plan→decision, `implements` for code→spec, `derived_from` for spec→spec, `references` otherwise);
   bare **`ADR-NNN`** reads under each repo's namespace (`<namespace>-ADR-NNN`, no renames; bare ids
   stay repo-local); every cross-repo fact is graded by **evidence tier** (`declared` > `identifier` >
