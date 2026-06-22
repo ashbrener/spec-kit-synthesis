@@ -163,6 +163,38 @@ def test_bare_id_without_namespace_mints_no_cross_repo_edge():
     assert edges == []                                            # nothing qualifies, no edge
 
 
+def test_adr_cross_reference_does_not_make_file_a_false_target():
+    # B2: ADR-002's file references ADR-018 in its Consequences; a spec also mentions ADR-018.
+    # Co-mention ≠ citation — the spec must NOT 'cite' the ADR-002 file as if it were ADR-018.
+    # (Here no real ADR-018 file exists, so nothing should resolve.)
+    corpus = _kinded_corpus("core", [
+        ("adr/ADR-002.md#h", "adr", "# CORE-ADR-002: Event bus\nThe decision."),
+        ("adr/ADR-002.md#cons", "adr", "## Consequences\nThis supersedes CORE-ADR-018."),
+        ("003/spec.md#s", "spec", "Our core obeys CORE-ADR-018."),
+    ])
+    m = _manifest([("core", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": corpus})
+    assert all("ADR-002" not in e.dst.locator for e in edges)   # no false target via co-mention
+    assert edges == []                                          # ADR-018 has no decision file → no cite
+
+
+def test_real_decision_cited_even_when_another_adr_cross_references_it():
+    # B2 (representative correctness): when a real ADR-018 file DOES exist, the cite must resolve to
+    # it — not to the ADR-002 file that merely cross-references ADR-018 (which sorts earlier).
+    corpus = _kinded_corpus("core", [
+        ("adr/ADR-002.md#h", "adr", "# CORE-ADR-002: Event bus\nThe decision."),
+        ("adr/ADR-002.md#cons", "adr", "## Consequences\nSupersedes CORE-ADR-018."),
+        ("adr/ADR-018.md#h", "adr", "# CORE-ADR-018: Legacy queue\nThe decision."),
+        ("003/spec.md#s", "spec", "Our core obeys CORE-ADR-018."),
+    ])
+    m = _manifest([("core", "spec")])
+    edges = dl.discover_adr_edges(m, {"core": corpus})
+    assert len(edges) == 1
+    e = edges[0]
+    assert e.rel is LinkRel.CITES and e.evidence == "CORE-ADR-018"
+    assert "ADR-018" in e.dst.locator and "ADR-002" not in e.dst.locator
+
+
 def test_generic_doc_mentioning_adr_id_mints_no_cite():
     # a non-citing kind (design-doc) mentioning an ADR id never mints a citation
     doc = _kinded_corpus("guide", [("g.md#x", "design-doc", "We follow CORE-ADR-001 broadly.")])

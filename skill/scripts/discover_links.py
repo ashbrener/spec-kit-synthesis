@@ -125,25 +125,50 @@ def qualify_adr(token: str, namespace: str | None) -> str | None:
     return None
 
 
+def _heading_adr_id(text: str | None) -> str | None:
+    """The ADR id named in a markdown heading line of `text`, or None. A heading is a fragment's
+    own identity (`# CORE-ADR-002: …`); ids that appear only in prose are cross-references."""
+    for line in (text or "").splitlines():
+        s = line.lstrip()
+        if not s.startswith("#"):
+            continue
+        m = _ADR_QUALIFIED.search(s) or _ADR_BARE.search(s)  # qualified first (bare is its suffix)
+        if m:
+            return m.group(0)
+    return None
+
+
+def _own_adr_qid(frag, namespace: str | None) -> str | None:
+    """The qualified id an ADR fragment IS — as opposed to ids it merely cross-references. Prefer
+    the adapter-assigned `feature_key` (the filename's ADR id); fall back to the heading line."""
+    own = (frag.feature_key or "").strip() or _heading_adr_id(frag.text)
+    return qualify_adr(own, namespace) if own else None
+
+
 def extract_adr_refs(corpus: FragmentCorpus, namespace: str | None) -> dict[str, dict[str, str]]:
     """Per-corpus ADR references → {qualified_adr_id: {kind: representative_locator}}.
 
     Both qualified and bare forms are scanned; a bare id is qualified with `namespace` (the
     owning repo's). Bare ids with no namespace are dropped (repo-local, never cross-matched).
     Only citing kinds (spec/plan) and adr kinds participate, so a generic doc mentioning an
-    ADR id in passing never mints a citation. Representative = the min locator per (id, kind),
-    keeping the edge count bounded and deterministic."""
+    ADR id in passing never mints a citation. An ADR fragment registers under the `adr` (object)
+    role for its OWN id only — a decision that cross-references another ADR in its body is not that
+    other decision (spec 004 B2 fix). Representative = the min locator per (id, kind), keeping the
+    edge count bounded and deterministic."""
     out: dict[str, dict[str, str]] = defaultdict(dict)
     for f in corpus.fragments:
         kind = f.kind
         if kind != _ADR_KIND and kind not in _CITING_KINDS:
             continue
         role_kind = _ADR_KIND if kind == _ADR_KIND else "citing"
+        own = _own_adr_qid(f, namespace) if role_kind == _ADR_KIND else None
         tokens = set(_ADR_QUALIFIED.findall(f.text or "")) | set(_ADR_BARE.findall(f.text or ""))
         for tok in tokens:
             qid = qualify_adr(tok, namespace)
             if qid is None:
                 continue
+            if role_kind == _ADR_KIND and qid != own:
+                continue  # a cross-reference to another decision, not this file's own id
             cur = out[qid].get(role_kind)
             out[qid][role_kind] = f.id if cur is None else min(cur, f.id)
     return out

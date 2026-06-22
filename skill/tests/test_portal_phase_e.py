@@ -42,6 +42,26 @@ def test_ungrounded_identifier_fails():
     assert any(v.check == vl.CHECK_EVIDENCE_GROUNDED for v in vios)
 
 
+def test_qualified_adr_evidence_grounded_by_bare_form_in_text():
+    # B1: discovery stores the QUALIFIED ADR id as the edge evidence, but an intra-repo source
+    # text often holds only the bare ADR-NNN. The gate must treat the bare form as grounding the
+    # qualified evidence — else it rejects ADR cites edges discovery legitimately created
+    # (fail-closed → no portal). The qualified id and its bare suffix denote the same decision.
+    g = LinkGraph(edges=[_edge("core", "core::plan.md#s", "core", "core::adr/ADR-009.md#d",
+                               LinkRel.CITES, LinkEvidenceKind.IDENTIFIER, "CORE-ADR-009")])
+    frag = {"core::plan.md#s": "Bound by ADR-009.", "core::adr/ADR-009.md#d": "# ADR-009\nThe decision."}
+    assert vl.verify_links(g, frag) == []
+
+
+def test_adr_edge_still_ungrounded_when_no_adr_id_present():
+    # guard: bare-form acceptance must not weaken fabrication detection — an ADR cites edge whose
+    # endpoints mention no ADR id at all is still rejected.
+    g = LinkGraph(edges=[_edge("core", "core::plan.md#s", "core", "core::adr/x.md#d",
+                               LinkRel.CITES, LinkEvidenceKind.IDENTIFIER, "CORE-ADR-009")])
+    frag = {"core::plan.md#s": "no decision cited here", "core::adr/x.md#d": "unrelated prose"}
+    assert any(v.check == vl.CHECK_EVIDENCE_GROUNDED for v in vl.verify_links(g, frag))
+
+
 def test_empty_evidence_fails():
     g = LinkGraph(edges=[_edge("a", "a::x", "b", "b::y", LinkRel.REFERENCES, LinkEvidenceKind.PROSE, "")])
     vios = vl.verify_links(g, {"a::x": "...", "b::y": "..."})
