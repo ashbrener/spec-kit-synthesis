@@ -24,6 +24,7 @@ CLI (exit code is the contract):
 
 from __future__ import annotations
 
+import re
 import sys
 
 from schema import FragmentCorpus, LinkEvidenceKind, LinkGraph
@@ -32,6 +33,19 @@ from verify import EXIT_BAD_INPUT, EXIT_OK, EXIT_VIOLATIONS, Violation, render_r
 CHECK_ENDPOINTS_RESOLVE = "ENDPOINTS_RESOLVE"
 CHECK_EVIDENCE_PRESENT = "EVIDENCE_PRESENT"
 CHECK_EVIDENCE_GROUNDED = "EVIDENCE_GROUNDED"
+
+_ADR_TOKEN = re.compile(r"ADR-\d{3,}")
+
+
+def _identifier_present(token: str, text: str) -> bool:
+    """The shared identifier grounds an endpoint if it appears literally — or, for a qualified ADR
+    id (`<NS>-ADR-NNN`), if its bare `ADR-NNN` form does. Discovery qualifies bare ids per-namespace,
+    so the stored evidence is the qualified id while the source text often holds only the bare form;
+    the two denote the same decision (B1). Non-ADR identifiers (FR-/slug) stay strict."""
+    if token in text:
+        return True
+    m = _ADR_TOKEN.search(token)
+    return bool(m and m.group(0) in text)
 
 
 def verify_links(graph: LinkGraph, frag_text: dict[str, str]) -> list[Violation]:
@@ -68,7 +82,7 @@ def verify_links(graph: LinkGraph, frag_text: dict[str, str]) -> list[Violation]
         st = frag_text.get(e.src.locator, "")
         dt = frag_text.get(e.dst.locator, "")
         if e.evidence_kind is LinkEvidenceKind.IDENTIFIER:
-            if e.evidence not in st or e.evidence not in dt:
+            if not (_identifier_present(e.evidence, st) and _identifier_present(e.evidence, dt)):
                 violations.append(Violation(
                     check=CHECK_EVIDENCE_GROUNDED, object_id=eid,
                     detail="shared-identifier edge: the identifier is not present in BOTH endpoints' source.",
