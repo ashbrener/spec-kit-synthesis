@@ -19,6 +19,24 @@ import adapter_doc  # noqa: E402
 import adapter_speckit  # noqa: E402
 
 
+def test_meta_and_archive_excluded(tmp_path):
+    # spec 010 R3: repo-meta + archives are not source-of-truth and must not be ingested.
+    (tmp_path / "99_Archive").mkdir()
+    (tmp_path / "99_Archive" / "old.md").write_text("# Old draft\nx", encoding="utf-8")
+    (tmp_path / "_Audits").mkdir()
+    (tmp_path / "_Audits" / "memo.md").write_text("# Audit memo\nx", encoding="utf-8")
+    for name in ("CLAUDE.md", "RESUME.md", "BACKEND_HANDOFF.md", "WORKTREES.md", "AGENTS.md"):
+        (tmp_path / name).write_text(f"# {name}\nx", encoding="utf-8")
+    (tmp_path / "real.md").write_text("# Real architecture doc\nGenuine source content.", encoding="utf-8")
+
+    corpus = adapter_doc.build_corpus(tmp_path, "proj")
+    ids = " ".join(f.id for f in corpus.fragments)
+    assert "real.md" in ids                                   # genuine source ingested
+    for noise in ("99_Archive", "_Audits", "CLAUDE.md", "RESUME.md", "BACKEND_HANDOFF.md",
+                  "WORKTREES.md", "AGENTS.md"):
+        assert noise not in ids, f"{noise} should be excluded from ingestion"
+
+
 ARCHITECTURE_MD = """# Architecture Overview
 
 The system is a pipeline.
