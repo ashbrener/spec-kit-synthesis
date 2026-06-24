@@ -24,6 +24,12 @@ several anchors is a member of EACH (multi-membership); a unit reachable from no
 as an orphan capability, a standalone `decision` (uncited ADR), `background`, or unclustered (a
 feature-less, edge-less fragment). Deterministic + reproducible: identical inputs → byte-identical
 ClusterSet.
+
+Spec 010 makes membership a faithful projection of the DECLARED graph: only `declared` edges +
+same-feature grouping confer membership; an `identifier` edge confers for `cites` (a specific ADR id)
+and for `derived_from`/`implements` only across a source↔build pair (never build↔build / source↔source
+— the measured noise); `prose` never. A broad/hub feature (one several others declare derived_from) is
+rendered faithfully and FLAGGED via `hub_dependents` (a governance signal) — never split or re-anchored.
 """
 
 from __future__ import annotations
@@ -34,7 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from pydantic import BaseModel  # noqa: E402
-from schema import FragmentCorpus, LinkGraph, SourceType  # noqa: E402
+from schema import FragmentCorpus, LinkEvidenceKind, LinkGraph, SourceType  # noqa: E402
 
 # The cross-repo relations strong enough to mean "same capability" (excludes untyped `references`).
 _STRONG_RELS = {"derived_from", "cites", "implements"}
@@ -76,6 +82,10 @@ class CapabilityCluster(BaseModel):
     tiers: list[str] = []                    # contributing origins, source first
     evidence: list[str] = []                 # why members joined — reviewable
     kind: str = "capability"                 # capability | decision | background (spec 007)
+    hub_dependents: int = 0                  # # distinct features that DECLARE derived_from this
+    #                                          anchor; >=2 == "broad (hub)" — a governance signal that
+    #                                          the declared grain is coarse (spec 010, FR-004). Faithful:
+    #                                          the reader flags, it does not split/re-anchor.
 
 
 class ClusterSet(BaseModel):
@@ -150,7 +160,7 @@ def _shape(fids: list[str], index: dict) -> str:
 
 def _emit_cluster(unit_ids: list[str], seed: str | None, evidence: list[str],
                   unit_frags: dict[str, list[str]], unit_origin: dict[str, str],
-                  source_origins: set[str], index: dict) -> CapabilityCluster:
+                  source_origins: set[str], index: dict, hub_dependents: int = 0) -> CapabilityCluster:
     members: dict[str, list[str]] = {}
     for u in sorted(unit_ids):
         for fid in sorted(unit_frags[u]):
@@ -160,7 +170,8 @@ def _emit_cluster(unit_ids: list[str], seed: str | None, evidence: list[str],
     rest = sorted(o for o in members if o not in source_origins)
     cid = seed or f"orphan:{min(fids)}"
     return CapabilityCluster(id=cid, seed=seed, members=members, tiers=srcs + rest,
-                             evidence=sorted(set(evidence)), kind=_classify(fids, index))
+                             evidence=sorted(set(evidence)), kind=_classify(fids, index),
+                             hub_dependents=hub_dependents)
 
 
 def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
@@ -191,8 +202,13 @@ def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
             unit_feature.setdefault(u, _feature_key(f))
     shape = {u: _shape(fids, index) for u, fids in unit_frags.items()}
 
-    # ── typed strong edges, lifted to the unit level (weak `references` excluded) ──
+    # ── typed strong edges, lifted to the unit level + EVIDENCE-TIER gated (spec 010, R1) ──
+    # Only DECLARED edges + same-feature grouping confer membership. An IDENTIFIER edge confers
+    # membership for `cites` (a specific ADR id — reliable) and for `derived_from`/`implements` ONLY
+    # across a source↔build pair (a real refinement); never build↔build / source↔source (the measured
+    # noise that chained the catch-alls). PROSE never confers. The weak `references` rel is excluded.
     strong: list[tuple[str, str, str, str]] = []   # (rel, src_unit, dst_unit, evidence_note)
+    declared_df_in: dict[str, set[str]] = {}        # anchor unit -> {units that DECLARE derived_from it} (FR-004)
     for e in link_graph.edges:
         rel = e.rel.value if hasattr(e.rel, "value") else str(e.rel)
         if rel not in _STRONG_RELS:
@@ -200,6 +216,15 @@ def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
         s, d = e.src.locator, e.dst.locator
         if s not in unit_of or d not in unit_of:
             continue
+        ek = e.evidence_kind
+        if ek is LinkEvidenceKind.DECLARED and rel == "derived_from":
+            declared_df_in.setdefault(unit_of[d], set()).add(unit_of[s])
+        if ek is LinkEvidenceKind.PROSE:
+            continue                                # inferred prose never confers membership
+        if ek is LinkEvidenceKind.IDENTIFIER and rel != "cites":
+            n_src = (e.src.origin in source_origins) + (e.dst.origin in source_origins)
+            if n_src != 1:
+                continue                            # identifier derived_from/implements: source↔build only
         note = f"{e.src.origin}:{_short(s)} {rel} {e.dst.origin}:{_short(d)}"
         strong.append((rel, unit_of[s], unit_of[d], note))
     strong.sort()
@@ -240,7 +265,8 @@ def build_clusters(corpora: dict[str, FragmentCorpus], link_graph: LinkGraph,
                     changed = True
         claimed |= members
         clusters.append(_emit_cluster(sorted(members), unit_feature[s], notes,
-                                      unit_frags, unit_origin, source_origins, index))
+                                      unit_frags, unit_origin, source_origins, index,
+                                      hub_dependents=len(declared_df_in.get(s, ()))))
 
     # ── orphans: union remaining units over derived_from/implements only (NO ADR bridge) ──
     remaining = [u for u in sorted(unit_frags) if u not in claimed]

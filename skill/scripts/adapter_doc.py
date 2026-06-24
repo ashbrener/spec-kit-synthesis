@@ -47,15 +47,29 @@ DEFAULT_EXTS = {".md", ".markdown"}
 # Directories never worth walking (mirrors adapter_code.SKIP_DIRS).
 SKIP_DIRS = {"node_modules", "venv", "__pycache__", "dist", "build"}
 
+# Non-source-of-truth residue (spec 010, R3): archives + repo/agent/process meta are not the
+# documented system, so they never become fragments/clusters. Dir match is a substring (catches
+# `99_Archive`, `_Audits`, `archive/`); file match is the basename or a `handoff` substring.
+_SKIP_DIR_SUBSTR = ("archive", "audit")
+_SKIP_META_FILES = {"claude.md", "agents.md", "gemini.md", "copilot-instructions.md",
+                    "resume.md", "worktrees.md"}
+
 
 def _is_skipped(rel: str, extra=frozenset()) -> bool:
     """Skip any path with a HIDDEN part (.git, .venv, .specify, .project-arc, .claude, … — all
     dot-dirs) or a part in SKIP_DIRS, plus the caller's `extra` excludes. An `extra` entry containing
     `/` is a PATH-PREFIX (skip exactly that subtree, spec 007); a bare name matches a path part. Lets a
-    source repo's narrative pass skip its specs_dir/adr_dir subtrees (no double-ingest)."""
+    source repo's narrative pass skip its specs_dir/adr_dir subtrees (no double-ingest). Also drops
+    non-source residue — archive/audit dirs and repo/agent/process meta files (spec 010, R3)."""
     parts = rel.split("/")
     if any(part.startswith(".") or part in SKIP_DIRS for part in parts):
         return True
+    low = [p.lower() for p in parts]
+    if any(sub in part for part in low[:-1] for sub in _SKIP_DIR_SUBSTR):
+        return True                                  # archive/audit directory at any depth
+    base = low[-1]
+    if base in _SKIP_META_FILES or "handoff" in base:
+        return True                                  # repo/agent/process meta file
     for e in extra:
         if "/" in e:
             e = e.rstrip("/")

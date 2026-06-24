@@ -24,10 +24,10 @@ def _corpus(origin, frags):
     return FragmentCorpus(project_name=origin, fragments=frags)
 
 
-def _edge(so, sl, do, dl, rel):
+def _edge(so, sl, do, dl, rel, ek=LinkEvidenceKind.IDENTIFIER):
     return LinkEdge(src=LinkEndpoint(origin=so, locator=f"{so}::{sl}"),
                     dst=LinkEndpoint(origin=do, locator=f"{do}::{dl}"),
-                    rel=rel, evidence_kind=LinkEvidenceKind.IDENTIFIER, evidence="FR-001")
+                    rel=rel, evidence_kind=ek, evidence="FR-001")
 
 
 def _ws():
@@ -117,8 +117,10 @@ def test_melded_chain_source_spec_code():
     api = _corpus("api", [_frag("api", "002-auth/plan.md", "002-auth", kind="plan")])
     web = _corpus("web", [_frag("web", "auth.py", None, kind="code", typ=SourceType.CODE)])
     lg = LinkGraph(edges=[
-        _edge("api", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM),
-        _edge("web", "auth.py", "api", "002-auth/plan.md", LinkRel.IMPLEMENTS),
+        _edge("api", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM),  # source<->build identifier
+        # cross-repo build<->build implements must be DECLARED to confer (spec 010: identifier
+        # derived_from/implements only confers source<->build; build<->build needs a declared edge).
+        _edge("web", "auth.py", "api", "002-auth/plan.md", LinkRel.IMPLEMENTS, LinkEvidenceKind.DECLARED),
     ])
     cs = cl.build_clusters({"core": core, "api": api, "web": web}, lg, source_origins={"core"})
     cap = [c for c in cs.clusters if c.seed == "auth"][0]
@@ -237,6 +239,81 @@ def test_no_membership_without_basis():
     cs = cl.build_clusters({"core": core, "api": api}, LinkGraph(edges=[]), source_origins={"core"})
     cap = [c for c in cs.clusters if c.seed == "auth"][0]
     assert "orphan" not in _mstr(cap)
+
+
+# ── contract-driven membership: evidence-tier gating + hub flag (spec 010) ───
+
+def test_identifier_build_to_build_confers_no_membership():
+    # R1: an identifier-inferred build↔build derived_from edge (shared FR/slug token) must NOT
+    # pull one build feature into another's capability.
+    core = _corpus("core", [_frag("core", "auth/spec.md", "auth")])
+    be = _corpus("be", [_frag("be", "002-auth/plan.md", "002-auth", kind="plan")])
+    fe = _corpus("fe", [_frag("fe", "001-scaffold/plan.md", "001-scaffold", kind="plan")])
+    lg = LinkGraph(edges=[
+        _edge("be", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM),       # source↔build (admitted)
+        _edge("fe", "001-scaffold/plan.md", "be", "002-auth/plan.md", LinkRel.DERIVED_FROM),  # build↔build identifier (noise)
+    ])
+    cs = cl.build_clusters({"core": core, "be": be, "fe": fe}, lg, source_origins={"core"})
+    cap = [c for c in cs.clusters if c.seed == "auth"][0]
+    assert "002-auth" in _mstr(cap)            # admitted source↔build refinement
+    assert "001-scaffold" not in _mstr(cap)    # build↔build identifier did NOT confer membership
+
+
+def test_identifier_source_to_build_still_confers():
+    # R1: an un-governed workspace (no declared slots) still clusters via a source↔build identifier.
+    core = _corpus("core", [_frag("core", "auth/spec.md", "auth")])
+    be = _corpus("be", [_frag("be", "002-auth/plan.md", "002-auth", kind="plan")])
+    lg = LinkGraph(edges=[_edge("be", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM)])
+    cs = cl.build_clusters({"core": core, "be": be}, lg, source_origins={"core"})
+    assert "002-auth" in _mstr([c for c in cs.clusters if c.seed == "auth"][0])
+
+
+def test_membership_invariant_to_inferred_noise():
+    # R1: adding build↔build identifier + prose edges changes NOTHING (declared drives membership).
+    core = _corpus("core", [_frag("core", "auth/spec.md", "auth"), _frag("core", "admin/spec.md", "admin")])
+    be = _corpus("be", [_frag("be", "002-auth/plan.md", "002-auth", kind="plan"),
+                        _frag("be", "003-admin/plan.md", "003-admin", kind="plan")])
+    declared = [
+        _edge("be", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.DECLARED),
+        _edge("be", "003-admin/plan.md", "core", "admin/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.DECLARED),
+    ]
+    noise = [
+        _edge("be", "002-auth/plan.md", "be", "003-admin/plan.md", LinkRel.DERIVED_FROM),                 # build↔build identifier
+        _edge("be", "003-admin/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.PROSE),  # prose
+    ]
+
+    def memb(cs):
+        return sorted((c.seed, tuple(sorted(f for v in c.members.values() for f in v))) for c in cs.clusters)
+
+    clean = cl.build_clusters({"core": core, "be": be}, LinkGraph(edges=declared), source_origins={"core"})
+    noisy = cl.build_clusters({"core": core, "be": be}, LinkGraph(edges=declared + noise), source_origins={"core"})
+    assert memb(clean) == memb(noisy)
+
+
+def test_hub_rendered_faithfully_and_flagged():
+    # FR-004: a feature ≥2 others declare derived_from is rendered as the declared capability
+    # (not split/re-anchored) and flagged with the dependent count.
+    core = _corpus("core", [_frag("core", "arch/spec.md", "arch")])
+    be = _corpus("be", [_frag("be", "002-auth/plan.md", "002-auth", kind="plan"),
+                        _frag("be", "003-admin/plan.md", "003-admin", kind="plan")])
+    lg = LinkGraph(edges=[
+        _edge("be", "002-auth/plan.md", "core", "arch/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.DECLARED),
+        _edge("be", "003-admin/plan.md", "core", "arch/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.DECLARED),
+    ])
+    cap = [c for c in cl.build_clusters({"core": core, "be": be}, lg, source_origins={"core"}).clusters
+           if c.seed == "arch"][0]
+    assert cap.hub_dependents == 2
+    assert "002-auth" in _mstr(cap) and "003-admin" in _mstr(cap)   # rendered as declared, not split
+
+
+def test_planned_and_orphan_have_zero_hub_dependents():
+    # FR-004: a feature with no declared dependents has hub_dependents == 0.
+    core = _corpus("core", [_frag("core", "auth/spec.md", "auth"), _frag("core", "planned/spec.md", "planned")])
+    be = _corpus("be", [_frag("be", "002-auth/plan.md", "002-auth", kind="plan")])
+    lg = LinkGraph(edges=[_edge("be", "002-auth/plan.md", "core", "auth/spec.md", LinkRel.DERIVED_FROM, LinkEvidenceKind.DECLARED)])
+    cs = cl.build_clusters({"core": core, "be": be}, lg, source_origins={"core"})
+    assert [c for c in cs.clusters if c.seed == "planned"][0].hub_dependents == 0
+    assert [c for c in cs.clusters if c.seed == "auth"][0].hub_dependents == 1
 
 
 # ── classification: capability / decision / background (spec 007) ────────────
