@@ -1,4 +1,4 @@
-# DESIGN — spec-kit-synthesis
+# DESIGN — spec-kit-atlas
 
 **Status:** design agreed; **Phase 1 built, proven faithful, and merged** (the
 spec-kit→storybook engine — see `examples/generated/RESULT.md` and `README.md`).
@@ -12,7 +12,7 @@ exists to answer one question: **how do we build a generator that produces
 documents like that one, faithfully, from any spec-kit project?**
 
 It answers the five questions the seed brief's §6 design pass requires:
-what a great output looks like (§1), the section structure (§2), the synthesis
+what a great output looks like (§1), the section structure (§2), the atlas
 strategy (§3), the input (§4), and the faithfulness guardrail (§5). Then it
 covers the pipeline, determinism, the engine, and open decisions.
 
@@ -27,7 +27,7 @@ covers the pipeline, determinism, the engine, and open decisions.
 
 ## 0. The one-paragraph thesis
 
-`spec-kit-synthesis` reads all of a project's spec-kit artifacts (and, when
+`spec-kit-atlas` reads all of a project's spec-kit artifacts (and, when
 available, its `workstate` snapshot), and uses an LLM as a **reasoning engine**
 to reconcile many overlapping, evolving, sometimes-contradictory specs into a
 single *current-state* architecture narrative, rendered as a self-contained HTML
@@ -88,7 +88,7 @@ draft doc, or a code symbol (§1.7 Layer 2, §5.1).
 
 The target document is the specification. Studying what makes it good yields the
 properties the generator must reproduce. These are the acceptance criteria for
-synthesis quality.
+atlas quality.
 
 1. **Organized by architecture, not by history.** Sections are *data model*,
    *components*, *flows*, *safety model* — the way the system is actually built.
@@ -105,7 +105,7 @@ synthesis quality.
    **once**, as a labelled *evolution note*, not as a competing description.
    (A second, smaller evolution — install moving from UUID-first to key-only
    discovery — is handled the same way.) This collapsing of a supersession into
-   current-state-plus-history is the heart of why this is synthesis, not
+   current-state-plus-history is the heart of why this is atlas, not
    rendering.
 
 3. **It reads top-down, plain English, newcomer-first.** It opens with what the
@@ -127,7 +127,7 @@ synthesis quality.
    numbered sections, a table of contents, interactive SVG diagrams for the
    pipeline and data model, and three callout types — *decision*, *unspecified*,
    *evolution*. These three callout types are not cosmetic; they map directly to
-   the three things synthesis must surface (a choice, a gap, a change over time).
+   the three things atlas must surface (a choice, a gap, a change over time).
 
 7. **It serves two audiences in one document, by progressive disclosure.** The
    storybook is the shared read-layer for *both* executives/evaluators and
@@ -209,7 +209,7 @@ Notes:
 
 ---
 
-## 3. Synthesis strategy
+## 3. Atlas strategy
 
 **Map-reduce in four phases**, not a single pass. Single-pass over all specs is
 viable only for tiny projects and fails exactly when the tool is most needed (a
@@ -323,7 +323,7 @@ and provenance are stable.
 > hand-edited.** They are intermediate output of a stateless compile (§11.2 #4),
 > not a persistent product model. Delete them and the next run recreates them
 > identically from the specs. This is categorically distinct from product-mem's
-> accumulating product graph — synthesis holds no state of record, only the
+> accumulating product graph — atlas holds no state of record, only the
 > current run's derivation. If a fact is wrong, you fix the *source* and
 > recompile; you never edit the model or the storybook.
 
@@ -340,7 +340,7 @@ target document draws its richest material — the decision rationale and
 alternatives (from `research.md`), the entity tables (from `data-model.md`), the
 API surface (from `contracts/`) — from artifacts whose content the current
 `workstate` floor does **not** fully carry. Today's spec-kit source emits
-shallow items (feature/task, `proposed`/`done`); synthesis needs the prose.
+shallow items (feature/task, `proposed`/`done`); atlas needs the prose.
 
 **Overlay input: `workstate`, when available** — used as an **authoritative
 structural corroborator**, not the content source:
@@ -348,7 +348,7 @@ structural corroborator**, not the content source:
 - the **relation graph**, above all `supersedes` edges,
 - the item **hierarchy** (what belongs to what).
 When workstate is present, reconcile trusts these signals over prose inference.
-When it's absent or thin, synthesis **degrades gracefully**: it parses structure
+When it's absent or thin, atlas **degrades gracefully**: it parses structure
 and lifecycle from the specs themselves. The tool must not hard-depend on a
 mature source — it should produce a good document from raw specs alone, and a
 *better*, more confidently-reconciled one when workstate is also supplied.
@@ -357,7 +357,7 @@ This keeps the ecosystem coherent (we consume the shared schema/parser when it's
 there) without betting the whole product on the source carrying content it
 currently doesn't.
 
-> **Consequence for sequencing:** synthesis can be developed and tested now,
+> **Consequence for sequencing:** atlas can be developed and tested now,
 > against raw specs, without waiting on a richer workstate. The bridge project's
 > three specs are the v1 fixture.
 
@@ -445,9 +445,9 @@ Faithfulness is enforced at every phase, not bolted on at the end.
   is "fragmented, overlapping, evolving design corpus → one faithful current-state
   read-model." spec-kit is just *one input shape*. So v1 separates an **input
   adapter** (spec-kit folders → an internal, source-neutral *fragment corpus*)
-  from the **synthesis core** (corpus → architecture model → document model). The
+  from the **atlas core** (corpus → architecture model → document model). The
   core never imports spec-kit assumptions. This costs little now and keeps open a
-  real future direction (§8 / §9.7): a standalone synthesis engine that consumes
+  real future direction (§8 / §9.7): a standalone atlas engine that consumes
   *any* fragmented design corpus (ADRs, RFCs, design docs) — a different input
   adapter, not a rewrite. Do NOT build the general platform now; just keep the
   seam clean so it remains possible.
@@ -496,11 +496,11 @@ Faithfulness is enforced at every phase, not bolted on at the end.
   - **Where a theme comes from (precedence, fail-soft):** (1) **detected** from
     the host project — existing CSS custom properties, a Tailwind/theme config,
     committed brand tokens, a logo palette; (2) **declared** in a committed
-    `synthesis.theme.{json,css}`; (3) a built-in named **preset**; (4) the
+    `atlas.theme.{json,css}`; (3) a built-in named **preset**; (4) the
     **default reference theme** as the guaranteed-good fallback. The interaction
     grammar and the *set* of diagram types stay constant across themes (that's
     what keeps quality consistent); only the tokens vary.
-  - **Theming is cosmetic and strictly downstream of synthesis — the load-
+  - **Theming is cosmetic and strictly downstream of atlas — the load-
     bearing rule.** The extract → reconcile → compose → verify pipeline and
     *every* faithfulness guarantee are theme-independent. A theme can change how
     a claim looks; it can never change which claims exist or what they say.
@@ -531,7 +531,7 @@ Faithfulness is enforced at every phase, not bolted on at the end.
        the truth. v1 ships visual tokens; the voice profile is a deferred,
        optional input (§8).
 - **CLI shape (provisional, mirrors the ecosystem):**
-  `spec-kit-synthesis --specs-dir specs/ [--workstate workstate.json] -o architecture.html`
+  `spec-kit-atlas --specs-dir specs/ [--workstate workstate.json] -o architecture.html`
   — auto-detect `specs/`, optional workstate overlay, HTML output. Fail-closed
   with guidance, same conventions as the bridge tool.
 - **Stack:** Python 3.11+, stdlib-first, minimal deps (HTTP client for the LLM
@@ -547,7 +547,7 @@ Faithfulness is enforced at every phase, not bolted on at the end.
 
 ## 7. Quality assurance & cross-model review
 
-Synthesis quality can't be unit-tested like a parser; it needs judgment.
+Atlas quality can't be unit-tested like a parser; it needs judgment.
 - **Golden target:** `examples/speckit-linear-architecture.html` is the
   reference. Generated output for the bridge project is compared against it for
   coverage, faithfulness, and readability.
@@ -578,7 +578,7 @@ core → document model → themed, interactive SVG renderer with the Layer&nbsp
 drill-down and named citations. Includes from day one: faithfulness +
 source-typed provenance (§5, §11.2), the fixed content-gated spine with inferred
 slots, fail-closed/"Unspecified", coverage-honesty framing (§5.8), the persisted
-diffable architecture model, default theme + presets + declared `synthesis.theme`,
+diffable architecture model, default theme + presets + declared `atlas.theme`,
 and the cross-model review gate. Fixture: the bridge project's specs, measured
 against the handwritten target.
 
@@ -599,7 +599,7 @@ exercise once the core is proven across ≥2 real source types, not a rewrite (�
 input (always an optional overlay); fully free-form outline inference;
 auto-layout / animated diagram *engines* beyond the curated hand-rendered SVG set
 (the fixed set of diagram types is in scope); multi-project / portfolio
-synthesis; "what changed since last doc" diffing; inline citations in the
+atlas; "what changed since last doc" diffing; inline citations in the
 *narrative* body (citations live in the Layer-2 drill-down, never the prose).
 
 ---
@@ -630,19 +630,19 @@ synthesis; "what changed since last doc" diffing; inline citations in the
    diffable model, prose may vary"* contract, with extract cached by
    content-hash. Stronger run-to-run prose stability (caching composed sections)
    is available later if a need appears, but is not worth the cost now.
-5. **Name.** Resolution (§11.3): keep `spec-kit-synthesis` (descriptive,
+5. **Name.** Resolution (§11.3): keep `spec-kit-atlas` (descriptive,
    honest). Revisit only if the standalone engine (#7) is pursued, when a
    source-neutral name might fit better.
 6. **Theming reach.** Resolution (§11.3): ship the default reference theme +
-   presets + a declared `synthesis.theme.{json,css}` in Phase 1; sequence
+   presets + a declared `atlas.theme.{json,css}` in Phase 1; sequence
    host-theme **detection** (from the project's CSS/Tailwind/brand files) into
    Phase 3. Rationale: always-correct beats subtly-wrong — a detected theme with
    the right hue but wrong type scale reads worse than an honest default;
    detection earns its way in once real host repos are in hand. Theming is
-   cosmetic and strictly downstream of synthesis (§6).
+   cosmetic and strictly downstream of atlas (§6).
 
-7. **Standalone synthesis engine / open-source (a strategic option to KEEP, not
-   build).** The synthesis core is source-agnostic (§6 adapter/core seam), so it
+7. **Standalone atlas engine / open-source (a strategic option to KEEP, not
+   build).** The atlas core is source-agnostic (§6 adapter/core seam), so it
    could stand alone as a general "fragments → faithful read-model" engine — and
    the underlying idea is a *new paradigm for spec writing*: author small
    fragments as you go, and let the synthesizer continuously regenerate the
@@ -680,7 +680,7 @@ synthesis; "what changed since last doc" diffing; inline citations in the
    as over-engineering** — its sole justification was sharing the look across
    many artifacts (slides, READMEs, …), which does not apply when the storybook
    is the only consumer. So the theme is delivered as **data the storybook
-   renderer reads** — `synthesis.theme.{json,css}` (declared) or a built-in
+   renderer reads** — `atlas.theme.{json,css}` (declared) or a built-in
    preset / the default reference theme — never as a separately installable,
    agent-invokable skill. The two-part separation still holds internally (the
    reasoning engine produces a theme-agnostic document model; the storybook
@@ -744,7 +744,7 @@ it is this seam.
    (specs [+ optional workstate overlay] + theme) → HTML. The tool never
    maintains a persistent, authoritative product model — that is product-mem's
    territory, reached only via the `workstate` format. This is the boundary that
-   keeps synthesis from disturbing a peer product graph: synthesis *renders*, it
+   keeps atlas from disturbing a peer product graph: atlas *renders*, it
    does not *accumulate state*. (See the build-artifact clarification in §3 —
    the architecture model and cache are per-run, never a product-of-record.)
 5. **Reconcile is the product.** Engineering care, eval budget, and cross-model
@@ -770,8 +770,8 @@ it is this seam.
 | 2 | Outline | **Fixed spine + 2 inferred cross-cutting slots.** No free-form outline inference. |
 | 3 | Provenance | **Named, source-typed citations in the Layer-2 drill-down.** Body stays number-free. |
 | 4 | Determinism | **Stable structure + diffable architecture model; prose may vary.** Cache extract by content-hash. |
-| 5 | Name | **`spec-kit-synthesis`** (revisit only if the standalone engine, #7, is pursued). |
-| 6 | Theme sourcing | **Default + presets + declared `synthesis.theme` now; host-theme detection sequenced next.** |
+| 5 | Name | **`spec-kit-atlas`** (revisit only if the standalone engine, #7, is pursued). |
+| 6 | Theme sourcing | **Default + presets + declared `atlas.theme` now; host-theme detection sequenced next.** |
 | 7 | Standalone engine / OSS | **Option preserved by the seam (11.1); not built until the engine is proven on real sources.** |
 | 8 | Multi-source | **Multi-source is the architecture; sources are sequenced (11.4). Spec-kit first, code next.** |
 | 9 | Theme delivery | **Theme is data the renderer reads; storybook is its only consumer.** No agent-invokable skill. |

@@ -15,7 +15,7 @@ from schema import (Altitude, Block, BlockType, DocumentModel, Section,  # noqa:
                     SourceRef, SourceType, WorkspaceManifest)
 
 FIX = Path(__file__).parent / "fixtures" / "workspace"
-MANIFEST = FIX / "synthesis.workspace.json"
+MANIFEST = FIX / "atlas.workspace.json"
 
 
 def test_load_manifest():

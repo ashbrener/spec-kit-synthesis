@@ -1,6 +1,6 @@
 """Contract drift guard (spec 004, FR-007 / SC-005).
 
-Synthesis conforms to the governance contracts AS A FORMAT — its enums must equal the pinned,
+Atlas conforms to the governance contracts AS A FORMAT — its enums must equal the pinned,
 vendored `vocabulary.json` (@0.2.0). This test fails the build the moment the reader's relation /
 role / kind / evidence set diverges from the pinned copy, so a silent mistruth can never ship.
 The vendored copy is updated only by re-pinning to a newer published tag.
@@ -44,7 +44,7 @@ def test_pinned_vocabulary_version_is_expected():
 
 
 def test_citation_slots_block_present_and_shaped():
-    # spec 008: synthesis reads the typed citation slots; pin their documented shape (ARCH-ADR-000 Amendment 2).
+    # spec 008: atlas reads the typed citation slots; pin their documented shape (ARCH-ADR-000 Amendment 2).
     cs = _vocabulary()["citation_slots"]
     assert cs["slots"]["derived_from"]["file"] == "spec.md"
     assert cs["slots"]["cites"]["file"] == "plan.md"

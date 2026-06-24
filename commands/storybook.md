@@ -1,9 +1,9 @@
 ---
-name: speckit.synthesis.storybook
+name: speckit.atlas.storybook
 description: Synthesize a project's scattered spec-kit specs into ONE faithful, beautiful, interactive whole-system architecture storybook (HTML). Use when someone wants a single plain-English "here is how this whole system is built" document generated from a repo's specs/ folders — for onboarding an engineer, briefing an evaluator, or seeing the de-fragmented current-state architecture. NOT a dashboard, NOT a per-spec renderer.
 ---
 
-# spec-kit-synthesis — the architecture storybook generator
+# spec-kit-atlas — the architecture storybook generator
 
 You (the in-session agent) **are the reasoning engine.** This skill does not
 shell out to another model. Your job is to read a project's spec-kit specs and
@@ -46,8 +46,8 @@ extension root (`$SYN`):
 
 ```
 # installed as a spec-kit extension (the usual case):
-SYN=.specify/extensions/synthesis
-# …or running inside the synthesis repo itself (development):
+SYN=.specify/extensions/atlas
+# …or running inside the atlas repo itself (development):
 SYN=.
 ```
 
@@ -67,13 +67,13 @@ specs/ ─[adapter: code]→ corpus.json
        ─[render: code]→ architecture.html
 ```
 
-Persist each phase's artifact to a working dir (e.g. `.synthesis/`) so the run
+Persist each phase's artifact to a working dir (e.g. `.atlas/`) so the run
 is reviewable and re-runnable. These are build IR, not products.
 
 ### Phase 0 — Adapt (deterministic; you just run it)
 
 ```
-uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/adapter_speckit.py" <specs_dir> --project-name "<Name>" --out .synthesis/corpus.json
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/adapter_speckit.py" <specs_dir> --project-name "<Name>" --out .atlas/corpus.json
 ```
 
 Produces a `FragmentCorpus`: every spec file split into source-typed
@@ -123,7 +123,7 @@ Combine all digests into ONE `ArchitectureModel`:
   describes the *specified* portion of the system; no claim of completeness
   (DESIGN §5.8). `verify.py` fails if this is empty.
 
-Persist `.synthesis/architecture_model.json`. Review it like a compiler IR —
+Persist `.atlas/architecture_model.json`. Review it like a compiler IR —
 it is the diffable record of what the run believes is true.
 
 ### Phase C — Compose (YOUR reasoning)
@@ -163,7 +163,7 @@ every claim keeps its source one click away (the citation chips) and every gap s
   cards), `hub` (a central core with radiating nodes — the first node is the
   core), `stack` (a layered architecture, built bottom-up), and `timeline` (an
   evolution, lit in chronological order).
-- **Optional voice profile.** If a `synthesis.voice.md` exists at the project
+- **Optional voice profile.** If a `atlas.voice.md` exists at the project
   root (or `--voice` is supplied), honour it here: it sets *how* prose reads —
   point of view, tone, casing, banned words, domain terminology, number
   formatting. It shapes phrasing ONLY. It must never change *which* claims
@@ -171,12 +171,12 @@ every claim keeps its source one click away (the citation chips) and every gap s
   are unaffected by voice. A voice profile can change the wording, never the
   truth. Absent one, write in the clear, plain register of the north-star.
 
-Persist `.synthesis/document_model.json`.
+Persist `.atlas/document_model.json`.
 
 ### Phase D — Verify (deterministic gate; FAIL-CLOSED)
 
 ```
-uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/verify.py" .synthesis/document_model.json .synthesis/architecture_model.json .synthesis/corpus.json
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/verify.py" .atlas/document_model.json .atlas/architecture_model.json .atlas/corpus.json
 ```
 
 Exit 0 ⇒ every claim's provenance resolves, every block's claims exist and are
@@ -187,7 +187,7 @@ fabricated locator, or a missing coverage note). Never edit the gate to pass.
 ### Render (deterministic)
 
 ```
-uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/render.py" .synthesis/document_model.json [--theme theme.json] --out architecture.html
+uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/render.py" .atlas/document_model.json [--theme theme.json] --out architecture.html
 ```
 
 Produces the self-contained interactive storybook in the editorial design system
@@ -198,7 +198,7 @@ References appendix. **Drill-to-source (spec 003):** every cited spec/ADR file i
 as a bundled, beautified page under `sources/`, and each citation chip opens it at the exact
 cited section — the source content is *copied into the HTML*, so the read surface is
 self-contained. A `--theme` JSON of CSS-variable tokens reskins everything (theming is
-cosmetic, downstream of synthesis — it can change how a claim looks, never which
+cosmetic, downstream of atlas — it can change how a claim looks, never which
 claims exist). The storybook is **generated, never hand-edited**: to fix a fact,
 fix the source and regenerate.
 

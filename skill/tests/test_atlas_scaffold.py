@@ -83,7 +83,7 @@ def test_ungoverned_with_manifest_builds_without_declared_topology(tmp_path):
     ws = tmp_path / "ws"
     (ws / "specs" / "001-x").mkdir(parents=True)
     (ws / "specs" / "001-x" / "spec.md").write_text("# X\n- **FR-001**: do a thing.\n", encoding="utf-8")
-    manifest = ws / "synthesis.workspace.json"
+    manifest = ws / "atlas.workspace.json"
     manifest.write_text(json.dumps({
         "title": "Plain", "members": [
             {"origin": "x", "path": "specs", "adapter": "speckit", "role": "spec", "title": "X"}]}),

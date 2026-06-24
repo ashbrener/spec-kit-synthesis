@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Detect a host project's design tokens and emit a `synthesis.theme.json`.
+"""Detect a host project's design tokens and emit a `atlas.theme.json`.
 
 The output is a *flat* JSON dict of {token: value} using a SUBSET of the keys in
 ``render.DEFAULT_THEME`` — exactly the ``--theme`` format that the existing
@@ -7,7 +7,7 @@ renderer accepts. ``render.py`` merges it over its defaults, so a *partial*
 detection is always safe: any token we don't detect inherits the default.
 
 Detection is deliberately **fail-soft** (DESIGN.md §6 / §9.6): theming is
-cosmetic and strictly downstream of synthesis. "Always-correct beats
+cosmetic and strictly downstream of atlas. "Always-correct beats
 subtly-wrong" — so we only emit a token when the host source name *clearly*
 corresponds, we surface low-confidence guesses as a WARNING on stderr for a
 human to review, and if nothing usable is found we emit ``{}`` (the renderer
@@ -17,7 +17,7 @@ No LLM. stdlib only. Deterministic: identical input → identical output.
 
 Usage::
 
-    uv run python skill/scripts/theme_detect.py <project_dir> [--out synthesis.theme.json]
+    uv run python skill/scripts/theme_detect.py <project_dir> [--out atlas.theme.json]
 
 Source priority (stop at the first that yields a usable palette):
   1. CSS custom properties — ``:root { --name: value; }`` across ``*.css``
@@ -442,7 +442,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Detect a host project's design tokens and emit a flat "
-            "synthesis.theme.json consumable by render.py --theme."
+            "atlas.theme.json consumable by render.py --theme."
         )
     )
     parser.add_argument("project_dir", help="Path to the host project to scan.")

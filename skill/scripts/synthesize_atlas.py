@@ -16,12 +16,12 @@ claim's source one click away. The atlas/graph (Phases D–E) is subordinate to 
 
 Usage:
     # Stage 0 — adapt every member, print the per-member hand-off brief:
-    uv run python skill/scripts/synthesize_atlas.py synthesis.workspace.json --work .synthesis-portal
+    uv run python skill/scripts/synthesize_atlas.py atlas.workspace.json --work .atlas-portal
 
     # Finish — once the agent has written each member's IR into the work dir,
     # render every page + the index into a site directory:
-    uv run python skill/scripts/synthesize_atlas.py synthesis.workspace.json \
-        --work .synthesis-portal --out site/ [--theme theme.json]
+    uv run python skill/scripts/synthesize_atlas.py atlas.workspace.json \
+        --work .atlas-portal --out site/ [--theme theme.json]
 
 Re-runnable: it always re-adapts, and finishes only when every member's
 document_model.json exists (and --out is given); otherwise it stops with the brief.
@@ -68,7 +68,7 @@ _ADAPTERS = {
 # ───────────────────── topology resolution (spec 004 US2) ────────────────────
 # When a project publishes a `.spec-arch-domain.yml`, it is the SOURCE OF TRUTH for structural
 # topology (members / roles / namespaces / locators), graded `declared`. The workspace record
-# (synthesis.workspace.json) supplies PRESENTATION (title/description/theme/order) always, and
+# (atlas.workspace.json) supplies PRESENTATION (title/description/theme/order) always, and
 # the full topology FALLBACK when no manifest is present. On overlap the manifest wins on
 # structural fields; the manifest carries no presentation. An ungoverned project (no manifest)
 # resolves to exactly its workspace record — unchanged behaviour.
@@ -132,7 +132,7 @@ def resolve_topology(manifest: WorkspaceManifest, domain_manifest=None) -> Resol
                 role=m.role, title=m.title, description=m.description))
     return ResolvedTopology(members=resolved, declared=bool(dmembers))
 
-ATLAS_HAND_OFF = """\
+MAP_HAND_OFF = """\
 ─────────────────────────────────────────────────────────────────────────────
  STAGE 0 COMPLETE — adapted {n} workspace member(s); origin-stamped corpora in {work}
 {members}
@@ -240,29 +240,29 @@ _INDEX_CSS = """
   .idx-card .idx-title{ display: block; font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; margin: 12px 0 6px; letter-spacing: -.01em; }
   .idx-card .idx-desc{ font-size: .95rem; color: #42392a; margin: 0 0 12px; max-width: none; }
   .idx-card .idx-go{ font-family: var(--font-mono); font-size: 12px; color: var(--gold); letter-spacing: .04em; }
-  .idx-atlas{ margin-top: 14px; }
-  .idx-atlas a{ font-family: var(--font-mono); font-size: 13px; color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); }
+  .idx-map{ margin-top: 14px; }
+  .idx-map a{ font-family: var(--font-mono); font-size: 13px; color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); }
 """
 
-_ATLAS_CSS = """
-  .atlas-edges{ display: flex; flex-direction: column; gap: 10px; margin: 28px 0; }
-  .atlas-edge{ display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; padding: 12px 16px;
+_MAP_CSS = """
+  .map-edges{ display: flex; flex-direction: column; gap: 10px; margin: 28px 0; }
+  .map-edge{ display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; padding: 12px 16px;
     border: 1px solid var(--line); border-radius: 6px; background: #fbf9f2; font-size: .95rem; }
-  .atlas-edge a{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); font-weight: 600; }
-  .atlas-edge .rel{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
-  .atlas-edge .ev{ font-family: var(--font-mono); font-size: 10.5px; color: #7d705a; margin-left: auto; }
-  .atlas-empty{ color: #7d705a; font-style: italic; margin: 28px 0; }
+  .map-edge a{ color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(44,74,99,.3); font-weight: 600; }
+  .map-edge .rel{ font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  .map-edge .ev{ font-family: var(--font-mono); font-size: 10.5px; color: #7d705a; margin-left: auto; }
+  .map-empty{ color: #7d705a; font-style: italic; margin: 28px 0; }
 """
 
 
-def render_index(manifest: WorkspaceManifest, theme: dict | None = None, has_atlas: bool = False) -> str:
+def render_index(manifest: WorkspaceManifest, theme: dict | None = None, has_map: bool = False) -> str:
     """Pure: a WorkspaceManifest → the book-of-books index HTML (one card per member)."""
     merged = {**render_mod.DEFAULT_THEME, **(manifest.theme or {}), **(theme or {})}
     css = build_css(merged) + _INDEX_CSS
     title = manifest.title or manifest.project_name or "Documentation Portal"
     project = manifest.project_name or title
-    atlas_link = ('<p class="idx-atlas"><a href="atlas.html">&rarr; Traceability atlas</a></p>'
-                  if has_atlas else "")
+    map_link = ('<p class="idx-map"><a href="map.html">&rarr; Traceability map</a></p>'
+                  if has_map else "")
     cards = "".join(
         f'<a class="idx-card" href="{esc(_page_filename(m.origin))}">'
         f'<span class="role {esc(m.role)}">{esc(m.role)}</span>'
@@ -286,20 +286,20 @@ def render_index(manifest: WorkspaceManifest, theme: dict | None = None, has_atl
         f'<h1 class="title">{esc(title)}</h1>'
         '<p class="dek">One readable storybook per repository — each the plain-English read of its '
         'source, with every claim a click from the exact spec or code.</p>'
-        f"{atlas_link}"
+        f"{map_link}"
         "</header>\n"
         f'<div class="idx-grid">{cards}</div>\n'
         '<footer id="refs"><div class="genline"><span class="gm">&#9679;</span> Generated by '
-        f'<a href="{render_mod.REPO_URL}" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a> '
+        f'<a href="{render_mod.REPO_URL}" target="_blank" rel="noopener noreferrer">spec-kit-atlas</a> '
         "— a portal of faithful, plain-English storybooks. Every claim is traceable to its source.</div></footer>\n"
         "</div>\n</body>\n</html>\n"
     )
 
 
-def render_atlas(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict | None = None) -> str:
+def render_map(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict | None = None) -> str:
     """Pure: a verified LinkGraph → the traceability atlas page (coverage-honest)."""
     merged = {**render_mod.DEFAULT_THEME, **(manifest.theme or {}), **(theme or {})}
-    css = build_css(merged) + _ATLAS_CSS
+    css = build_css(merged) + _MAP_CSS
     base_title = manifest.title or manifest.project_name or "Documentation Portal"
     project = manifest.project_name or base_title
     members = {m.origin: m for m in manifest.members}
@@ -319,15 +319,15 @@ def render_atlas(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict
             sname = so.title if (so and so.title) else e.src.origin
             dname = do.title if (do and do.title) else e.dst.origin
             rows.append(
-                '<div class="atlas-edge">'
+                '<div class="map-edge">'
                 f'<a href="{esc(_page_filename(e.src.origin))}">{esc(sname)}</a>'
                 f'<span class="rel">{esc(e.rel.value)}</span>'
                 f'<a href="{esc(_page_filename(e.dst.origin))}">{esc(dname)}</a>'
                 f'<span class="ev">{esc(e.evidence_kind.value)}: {esc(e.evidence[:48])}</span>'
                 "</div>")
-        body = '<div class="atlas-edges">' + "".join(rows) + "</div>"
+        body = '<div class="map-edges">' + "".join(rows) + "</div>"
     else:
-        body = ('<p class="atlas-empty">No cross-repo links discovered yet — add declared links, '
+        body = ('<p class="map-empty">No cross-repo links discovered yet — add declared links, '
                 "shared qualified identifiers (FR-NNN / feature slugs), or agent-discovered prose references.</p>")
     return (
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
@@ -339,7 +339,7 @@ def render_atlas(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict
         '<div class="grain"></div>\n<div class="wrap">\n'
         '<header class="mast">'
         f'<a href="index.html" class="brand-logo" aria-label="{esc(project)}">{GLYPH}<span class="brand-word">{esc(project)}</span></a>'
-        '<div class="kicker"><span>Traceability Atlas</span><span>intent &rarr; docs &rarr; specs &rarr; code</span></div>'
+        '<div class="kicker"><span>Traceability Map</span><span>intent &rarr; docs &rarr; specs &rarr; code</span></div>'
         '<h1 class="title">Traceability</h1>'
         '<p class="dek">How the readable storybooks connect — every link verified, fail-closed; '
         'a fabricated cross-repo link cannot ship.</p>'
@@ -347,7 +347,7 @@ def render_atlas(manifest: WorkspaceManifest, link_graph: LinkGraph, theme: dict
         f"{note}\n{body}\n"
         '<footer id="refs"><div class="genline"><span class="gm">&#9679;</span> '
         '<a href="index.html">&larr; Back to the portal</a> &nbsp;&middot;&nbsp; Generated by '
-        f'<a href="{render_mod.REPO_URL}" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a>.</div></footer>\n'
+        f'<a href="{render_mod.REPO_URL}" target="_blank" rel="noopener noreferrer">spec-kit-atlas</a>.</div></footer>\n'
         "</div>\n</body>\n</html>\n"
     )
 
@@ -360,7 +360,7 @@ def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | No
     Drill-to-source (spec 003): every member's cited source files are rendered as bundled,
     beautified pages under `sources/<origin>/`, and citation chips drill into the OWNING repo's
     source content across the whole workspace (`build_workspace_source_resolver`). A LinkGraph
-    still adds the verified atlas.html and acts as a cross-repo PAGE-link fallback. Members
+    still adds the verified map.html and acts as a cross-repo PAGE-link fallback. Members
     without a DocumentModel are omitted — a half-built portal renders honestly."""
     merged_theme = {**(manifest.theme or {}), **(theme or {})}
     corpora = corpora or {}
@@ -389,8 +389,8 @@ def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | No
             for name, html in pages.items():
                 site[f"sources/{m.origin}/{name}"] = html
     if link_graph is not None:
-        site["atlas.html"] = render_atlas(manifest, link_graph, theme)
-    site["index.html"] = render_index(manifest, theme, has_atlas=link_graph is not None)
+        site["map.html"] = render_map(manifest, link_graph, theme)
+    site["index.html"] = render_index(manifest, theme, has_map=link_graph is not None)
     return site
 
 
@@ -398,7 +398,7 @@ def build_site(manifest: WorkspaceManifest, doc_models: dict, corpora: dict | No
 # The portal is ONE capability-organized story (not a book-of-books). The agent reasons ONE melded
 # pair (architecture_model + document_model) over the MERGED workspace corpus, organized by the
 # deterministic capability clusters; the page engine renders it with per-tier disclosures, build-status
-# fading, human-titled source tables, and drill-to-source. The old build_site/render_atlas/render_index
+# fading, human-titled source tables, and drill-to-source. The old build_site/render_map/render_index
 # remain as (unit-tested) library functions but are no longer the portal's output.
 
 MELD_HAND_OFF = """\
@@ -425,13 +425,13 @@ def build_meld_site(meld_doc: DocumentModel, corpora: dict, title_map: dict,
 
     One `index.html` (the melded story) + bundled drill-to-source pages under `sources/<origin>/`.
     Citations drill into the owning repo's source content (any related repo); the title map renders
-    human-titled source tables. No per-member storybooks, no edge-list atlas."""
+    human-titled source tables. No per-member storybooks, no edge-list map."""
     merged_theme = theme or {}
     source_resolver = render_sources.build_workspace_source_resolver(corpora) if corpora else None
     site: dict[str, str] = {}
     site["index.html"] = render_mod.render(meld_doc, merged_theme, resolve=source_resolver,
                                            titles=title_map, catalog_href="catalog.html")
-    # the hierarchical source index (tree) replaces the edge-list atlas (spec 006)
+    # the hierarchical source index (tree) replaces the edge-list map (spec 006)
     tree = source_index.build_tree(corpora)
     site["catalog.html"] = source_index.render_index_tree(tree, merged_theme, story_href="index.html")
     for origin, corpus in corpora.items():
@@ -448,13 +448,13 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Build a documentation portal from a workspace manifest (spec 002), "
                                 "or auto-scaffold one from governance contracts on a governed workspace (spec 005).")
     p.add_argument("manifest", nargs="?", default=None,
-                   help="Path to synthesis.workspace.{json,toml}. Optional on a governed workspace "
+                   help="Path to atlas.workspace.{json,toml}. Optional on a governed workspace "
                         "(the manifest is derived); when given, it overlays the derived manifest.")
     p.add_argument("--from", dest="from_dir", default=".",
                    help="Where to start authority discovery on a governed workspace (default: cwd).")
     p.add_argument("--authority", default=None,
                    help="Authority repo that owns .spec-arch-domain.yml (overrides discovery).")
-    p.add_argument("--work", default=".synthesis-portal", help="Working dir for per-member IR (default: .synthesis-portal).")
+    p.add_argument("--work", default=".atlas-portal", help="Working dir for per-member IR (default: .atlas-portal).")
     p.add_argument("--out", default=None, help="Site output directory. Requires every member's document_model.json.")
     p.add_argument("--theme", default=None, help="Optional theme-token JSON applied to the whole portal.")
     args = p.parse_args(argv)
@@ -482,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = scaffold.overlay_manifest(derived, operator)
     if manifest is None:
         print("synthesize_atlas: ungoverned workspace and no manifest given — nothing to build. "
-              "Provide a synthesis.workspace.json, or run inside a governed workspace "
+              "Provide a atlas.workspace.json, or run inside a governed workspace "
               "(a repo reachable to a .spec-arch-domain.yml).", file=sys.stderr)
         return 2
 

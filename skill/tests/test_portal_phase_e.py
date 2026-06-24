@@ -120,30 +120,30 @@ def _graph():
                                   LinkEvidenceKind.IDENTIFIER, "FR-007")])
 
 
-def test_render_atlas_links_members_and_is_coverage_honest():
-    html = atlas.render_atlas(_manifest(), _graph())
+def test_render_map_links_members_and_is_coverage_honest():
+    html = atlas.render_map(_manifest(), _graph())
     assert html.startswith("<!DOCTYPE html>")
     assert 'href="docs.html"' in html and 'href="specs.html"' in html
     assert "references" in html and "FR-007" in html
     assert "partial" in html                                  # docs+spec but no code → honest caveat
-    assert atlas.render_atlas(_manifest(), _graph()) == html  # deterministic
+    assert atlas.render_map(_manifest(), _graph()) == html  # deterministic
 
 
-def test_render_atlas_empty_graph_is_honest():
-    assert "No cross-repo links discovered yet" in atlas.render_atlas(_manifest(), LinkGraph(edges=[]))
+def test_render_map_empty_graph_is_honest():
+    assert "No cross-repo links discovered yet" in atlas.render_map(_manifest(), LinkGraph(edges=[]))
 
 
 def test_build_site_with_graph_adds_atlas_resolver_and_index_link():
     site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")}, link_graph=_graph())
-    assert "atlas.html" in site
-    assert 'href="atlas.html"' in site["index.html"]          # index links the atlas
+    assert "map.html" in site
+    assert 'href="map.html"' in site["index.html"]          # index links the atlas
     assert 'href="specs.html"' in site["docs.html"]           # chip drills cross-repo to dst page (no corpora → page fallback)
 
 
 def test_build_site_without_graph_is_unchanged():
     site = atlas.build_site(_manifest(), {"docs": _one_ref_doc("docs::o#x")})
-    assert "atlas.html" not in site
-    assert 'href="atlas.html"' not in site["index.html"]
+    assert "map.html" not in site
+    assert 'href="map.html"' not in site["index.html"]
 
 
 def test_build_site_with_corpora_drills_to_bundled_source():

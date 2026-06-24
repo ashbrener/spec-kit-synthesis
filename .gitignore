@@ -8,8 +8,8 @@ __pycache__/
 .pytest_cache/
 
 # per-run build artifacts (stateless; regenerated each run — DESIGN §11.2 #4)
-# .synthesis/ is the default work dir; .synthesis-<name>/ are scratch dogfood dirs
-.synthesis*/
+# .atlas/ is the default work dir; .atlas-<name>/ are scratch dogfood dirs
+.atlas*/
 
 # Spec-kit self-host (sibling convention): COMMIT the scaffold
 # (.specify/scripts, /templates, /memory/constitution.md) — ignore only runtime + per-checkout state.

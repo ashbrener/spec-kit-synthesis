@@ -51,7 +51,7 @@ def test_meld_site_is_one_story_plus_sources_no_perrepo_no_atlas():
     assert any(k.startswith("sources/backend/") for k in site)
     # no per-repo storybooks, no edge-list atlas
     assert "docs.html" not in site and "backend.html" not in site
-    assert "atlas.html" not in site
+    assert "map.html" not in site
     # the hierarchical source index (tree) replaces the graph
     assert "catalog.html" in site
     assert 'class="ixtree"' in site["catalog.html"]

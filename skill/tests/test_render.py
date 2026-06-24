@@ -154,7 +154,7 @@ def test_references_appendix_and_colophon():
     assert 'class="colophon"' in out
     assert "fail-closed · 6 checks" in out
     # the tool credits itself with a repo hyperlink (fixed chrome)
-    assert 'href="https://github.com/ashbrener/spec-kit-synthesis"' in out
+    assert 'href="https://github.com/ashbrener/spec-kit-atlas"' in out
     assert 'target="_blank"' in out
 
 
