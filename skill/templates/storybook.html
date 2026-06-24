@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-  spec-kit-synthesis · STORYBOOK DESIGN SYSTEM — reference skeleton
+  spec-kit-atlas · STORYBOOK DESIGN SYSTEM — reference skeleton
   ============================================================================
   This is the canonical visual contract for the renderer. The renderer (v2)
   emits THIS structure, populated from a DocumentModel. Open it in a browser
@@ -354,9 +354,9 @@
 
 <!-- ============ SLOT: masthead — DocumentModel.title / dek / project meta ============ -->
 <header class="mast">
-  <a href="#summary" class="brand-logo" aria-label="synthesis">
+  <a href="#summary" class="brand-logo" aria-label="atlas">
     <!-- SLOT: brand mark — neutral glyph (renderer injects project mark or this default). -->
-    <svg viewBox="0 0 168 40" role="img" aria-label="synthesis" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 168 40" role="img" aria-label="atlas" xmlns="http://www.w3.org/2000/svg">
       <g class="spin-star">
         <g transform="translate(18,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round">
           <line x1="-13" y1="0" x2="13" y2="0"/>
@@ -365,15 +365,15 @@
           <line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/>
         </g>
       </g>
-      <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">synthesis</text>
+      <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">atlas</text>
     </svg>
   </a>
   <div class="kicker">
     <span>Architecture Storybook</span>     <!-- SLOT: kicker.left  — doc kind -->
-    <span>Synthesised from N sources</span>  <!-- SLOT: kicker.right — source summary -->
+    <span>Atlased from N sources</span>  <!-- SLOT: kicker.right — source summary -->
   </div>
   <h1 class="title">The Storybook <em>Design System</em></h1> <!-- SLOT: title (+ em accent) -->
-  <p class="dek">A reference rendering of every component the synthesis renderer can emit — type, callouts, tables, disclosure, diagrams, and source-typed citations. Neutral placeholder content; zero client data.</p> <!-- SLOT: dek -->
+  <p class="dek">A reference rendering of every component the atlas renderer can emit — type, callouts, tables, disclosure, diagrams, and source-typed citations. Neutral placeholder content; zero client data.</p> <!-- SLOT: dek -->
   <div class="meta-row"> <!-- SLOT: meta-row — project metadata pairs -->
     <span><b>Project</b> example-system</span>
     <span><b>Sources</b> spec · code · design-doc</span>
@@ -386,8 +386,8 @@
 <!-- ============ SLOT: sticky nav — one anchor per Section ============ -->
 <nav class="toc" id="toc">
   <div class="wrap">
-    <a href="#summary" class="brand-mark" aria-label="synthesis">
-      <svg viewBox="0 0 168 40" role="img" aria-label="synthesis" xmlns="http://www.w3.org/2000/svg">
+    <a href="#summary" class="brand-mark" aria-label="atlas">
+      <svg viewBox="0 0 168 40" role="img" aria-label="atlas" xmlns="http://www.w3.org/2000/svg">
         <g class="spin-star">
           <g transform="translate(18,20)" stroke="#16140f" stroke-width="3" stroke-linecap="round">
             <line x1="-13" y1="0" x2="13" y2="0"/>
@@ -396,7 +396,7 @@
             <line x1="-9.2" y1="9.2" x2="9.2" y2="-9.2"/>
           </g>
         </g>
-        <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">synthesis</text>
+        <text x="44" y="27" font-family="'Fraunces',serif" font-weight="900" font-size="22" fill="#16140f">atlas</text>
       </svg>
     </a>
     <button class="navbtn" id="navbtn" aria-expanded="false" aria-controls="toclinks">
@@ -465,7 +465,7 @@
   <span class="anchor"></span>
   <span class="sec-num">03 — Marked passages</span>
   <h2>Callouts &amp; citations</h2>
-  <p>Three callout variants carry the three things a faithful synthesis must mark out: a settled decision, an unspecified gap, and an evolution in the record.</p>
+  <p>Three callout variants carry the three things a faithful atlas must mark out: a settled decision, an unspecified gap, and an evolution in the record.</p>
   <div class="note flag-ok"><span class="tag">Decision</span>A resolved architectural choice. Green left-rule. Maps to <span class="mono">CalloutKind.decision</span>; the body cites the source that settled it.</div>
   <div class="note flag"><span class="tag">Unspecified</span>A genuine gap — something the sources do not pin down. Red left-rule. Maps to <span class="mono">CalloutKind.unspecified</span>; the gate requires the body be non-empty.</div>
   <div class="note"><span class="tag">Evolution</span>A superseded position kept for the record. Neutral rule. Maps to <span class="mono">CalloutKind.evolution</span>; cites the history entry, not the demoted claim.</div>
@@ -607,7 +607,7 @@
   <span class="anchor"></span>
   <span class="sec-num">07 — Where it came from</span>
   <h2>Source cards</h2>
-  <p>Every source the synthesis read, typed and located. These cards are the human face of the provenance the gate enforces.</p>
+  <p>Every source the atlas read, typed and located. These cards are the human face of the provenance the gate enforces.</p>
   <div class="vgrid">
     <div class="vcard">
       <div class="vh"><span class="vn">Feature spec</span><span class="vloc">spec</span></div>
@@ -657,7 +657,7 @@
   </table>
 
   <div class="genline">
-    <span class="gm">●</span> Generated by <a href="https://github.com/ashbrener/spec-kit-synthesis" target="_blank" rel="noopener noreferrer">spec-kit-synthesis</a> — a faithful synthesis of many sources into one architecture narrative. Organised by architecture, not authoring history. Every claim is traceable to its source.
+    <span class="gm">●</span> Generated by <a href="https://github.com/ashbrener/spec-kit-atlas" target="_blank" rel="noopener noreferrer">spec-kit-atlas</a> — a faithful atlas of many sources into one architecture narrative. Organised by architecture, not authoring history. Every claim is traceable to its source.
   </div>
 </footer>
 </div>

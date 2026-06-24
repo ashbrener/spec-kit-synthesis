@@ -16,7 +16,7 @@ FIXWS = Path(__file__).parent / "fixtures" / "workspace"
 
 
 def _manifest(tmp, members):
-    p = tmp / "synthesis.workspace.json"
+    p = tmp / "atlas.workspace.json"
     p.write_text(json.dumps({"title": "T", "project_name": "t", "members": members}), encoding="utf-8")
     return p
 

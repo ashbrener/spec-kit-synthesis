@@ -1,4 +1,4 @@
-# SEED BRIEF — spec-kit-synthesis
+# SEED BRIEF — spec-kit-atlas
 
 > **Read top-to-bottom before doing anything.** You are starting cold. This
 > brief is self-contained. Full backstory: `~/Code/AI/workstate-schema/PROJECT-BRIEF.md`
@@ -13,7 +13,7 @@
 
 ## 0. What this is, in one plain sentence
 
-`spec-kit-synthesis` reads a project's scattered spec-kit specs and produces
+`spec-kit-atlas` reads a project's scattered spec-kit specs and produces
 **one readable, plain-English document describing the technical architecture
 of the whole system** — the thing you'd hand a new developer or a commercial
 team to explain "here is how this system is built." Output is HTML (nicer than
@@ -42,12 +42,12 @@ Think: it produces **the architecture BOOK**, not the **filing cabinet**.
   PER-FEATURE / per-entity documents (the card catalog). This produces the
   synthesized WHOLE-SYSTEM story (the book). Different output entirely. (An
   earlier worry that product-mem "already does this" was WRONG once the real
-  intent — synthesis, not per-spec rendering — was understood.)
+  intent — atlas, not per-spec rendering — was understood.)
 
 ## 3. The shape of the thing
 
 ```
-spec files (specs/NNN-*/)  →  [LLM SYNTHESIS]  →  architecture narrative  →  HTML
+spec files (specs/NNN-*/)  →  [LLM ATLAS]  →  architecture narrative  →  HTML
 ```
 
 The middle step is the product. It is a **reasoning task, not a template**:
@@ -62,7 +62,7 @@ The trackers (spec-kit-linear/jira) consume STRUCTURED `workstate`
 decisions, rationale, clarification history. Two options to weigh in design:
 - **(a)** Consume `workstate` (its `body`, `notes`, `links` fields) — reuses
   the same parser/contract as the trackers; keeps the ecosystem coherent.
-- **(b)** Read the specs more directly — synthesis may want richer raw text
+- **(b)** Read the specs more directly — atlas may want richer raw text
   than the floor `workstate` carries.
 Likely answer: consume `workstate` for STRUCTURE (what items exist, how they
 relate, lifecycle) + read spec bodies for CONTENT. But this is a real design
@@ -73,7 +73,7 @@ decision — do not assume. The schema lives at `~/Code/AI/workstate-schema/`.
 - **Build this AFTER `spec-kit-jira` proves `workstate`.** Rationale: Jira is
   the foundation test; once two sinks consume `workstate` you KNOW the format
   and parser are sound, and you've seen real `workstate` output to design
-  against. Building synthesis on an unproven format risks baking in a flaw.
+  against. Building atlas on an unproven format risks baking in a flaw.
 - It is architecturally INDEPENDENT of the trackers (no shared code beyond
   possibly the parser / workstate). So it can be its own repo, its own
   session, its own pace.
@@ -89,12 +89,12 @@ The build is easy; knowing what to build is hard. Produce a design doc
 2. **What's the section structure** of the synthesized doc? (Overview → data
    model → components → flows → decisions/rationale → ...?) Is it fixed, or
    inferred per-project?
-3. **The synthesis strategy:** one big LLM pass over all specs? Or map-reduce
+3. **The atlas strategy:** one big LLM pass over all specs? Or map-reduce
    (summarize each spec → synthesize the summaries)? How to handle
    contradictions / superseded specs (use lifecycle state — merged/superseded
    — to weight)? How to keep it deterministic-enough to regenerate sanely?
 4. **Input:** workstate, raw specs, or both (§4).
-5. **Faithfulness guardrail:** synthesis must NOT hallucinate architecture the
+5. **Faithfulness guardrail:** atlas must NOT hallucinate architecture the
    specs don't support. How is the output grounded/citeable back to specs?
    (This is the integrity bar — a confident, wrong architecture doc is worse
    than none. Mirror the "fail-closed / surface uncertainty" discipline from
@@ -105,7 +105,7 @@ Only after DESIGN.md is agreed should generator code start.
 
 ## 7. Naming
 
-`spec-kit-synthesis` is the working name (descriptive: it synthesizes).
+`spec-kit-atlas` is the working name (descriptive: it synthesizes).
 Alternatives considered: `spec-kit-architecture-doc`. Avoid "portal" / "living
 spec site" — both implied the wrong dashboard thing. Confirm the name when the
 design firms up.
@@ -117,7 +117,7 @@ design firms up.
 - ONE mutating shell/tool call per message; serialize writes.
 - Worktree-isolate code-writing subagents.
 - Cross-model review (gpt-5.5 via wingman) at phase boundaries — especially
-  valuable here to critique the SYNTHESIS QUALITY (is the generated doc
+  valuable here to critique the ATLAS QUALITY (is the generated doc
   actually good / faithful?).
 - Run exact CI locally before pushing. HTTPS-via-gh for pushes (SSH has no
   key). NO AI-attribution trailers in commits.

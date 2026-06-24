@@ -1,4 +1,4 @@
-# HANDOFF — spec-kit-synthesis (resume after compaction)
+# HANDOFF — spec-kit-atlas (resume after compaction)
 
 > Written at ~99% context. If you're resuming cold: read this top-to-bottom.
 > Decisions are made and recorded — don't re-litigate. Full rationale is in
@@ -6,17 +6,17 @@
 
 ## What this is
 
-`spec-kit-synthesis` — a Claude Code **skill** that synthesizes a project's
+`spec-kit-atlas` — a Claude Code **skill** that synthesizes a project's
 scattered spec-kit specs into ONE faithful, interactive, whole-system
 architecture **storybook** (HTML). The in-session agent IS the reasoning engine
 (no API key, no subprocess); deterministic `uv` scripts hold the parsing, the
 fail-closed faithfulness gate, and the renderer. NOT a dashboard, NOT a per-spec
-renderer — a synthesis. Organized by architecture, not spec history; spec
+renderer — a atlas. Organized by architecture, not spec history; spec
 numbers never appear in narrative prose (only in Layer-2 citation chips).
 
 ## STATUS: v1 COMPLETE. All work merged to `main`. Repo is clean.
 
-- Remote: https://github.com/ashbrener/spec-kit-synthesis — default branch
+- Remote: https://github.com/ashbrener/spec-kit-atlas — default branch
   `main` (was wrongly pointing at a dead design branch — fixed). Only `main`
   exists remotely; all feature branches pruned. About-description + topics set.
 - **Phases 1–3 shipped & merged** (PRs #1–#7): the engine, code-as-source +
@@ -38,30 +38,30 @@ numbers never appear in narrative prose (only in Layer-2 citation chips).
   cold-territory error the gate exists to catch. Corrected to 0/0/0.
 - **Next action there:** operator reviews/merges PR #51. Nothing blocking on
   our side. The generated file is also at
-  `spec-kit-synthesis/.synthesis-arc/project-arc-architecture.html`.
+  `spec-kit-atlas/.atlas-arc/project-arc-architecture.html`.
 
 ## How to run it (the recipe, proven on 2 projects)
 
 ```bash
-cd ~/Code/AI/spec-kit-synthesis
+cd ~/Code/AI/spec-kit-atlas
 # 1. adapt (specs only, or + code for coverage, or + docs):
 uv run python skill/scripts/synthesize.py <repo>/specs --code <repo>/src \
-    --work .synthesis-<name> --project-name "<name>"
+    --work .atlas-<name> --project-name "<name>"
 # → writes corpus.json + locators.txt + a hand-off brief.
 # 2. the in-session agent reasons extract→reconcile→compose, writing
-#    .synthesis-<name>/architecture_model.json + document_model.json,
+#    .atlas-<name>/architecture_model.json + document_model.json,
 #    citing ONLY locators from locators.txt. At many specs, FAN OUT one
 #    extract sub-agent per feature folder (proven: 10 agents for project-arc).
 #    Then reconcile (merge overlaps, demote supersessions to history[]) yourself.
 # 3. verify (fail-closed) + render:
 uv run python skill/scripts/synthesize.py <repo>/specs --code <repo>/src \
-    --work .synthesis-<name> --out architecture.html
+    --work .atlas-<name> --out architecture.html
 # 4. Codex faithfulness gate (the acceptance bar), iterate to 0/0/0:
 codex exec --skip-git-repo-check --add-dir <repo> -o /tmp/rev.txt "<adversarial review prompt>"
 ```
 
 Reconcile is done via a build script in the work dir (e.g.
-`.synthesis-arc/build_arc.py`) that loads the digests and pulls `source_refs`
+`.atlas-arc/build_arc.py`) that loads the digests and pulls `source_refs`
 by claim id — so authored structure stays grounded in real citations. This is
 the honest shape today: pipeline + gates are proven; reconcile is agent-authored
 per run (a fully push-button reconcile UX is not built).
@@ -100,8 +100,8 @@ theme_detect, synthesize), `skill/tests/` (93 tests), `examples/`,
   `git -c credential.helper='!gh auth git-credential' push https://github.com/ashbrener/<repo>.git <branch>`
 - NO AI-attribution / Co-Authored-By trailers in commits.
 - Toolchain is `uv`, never pip.
-- `.synthesis*/` work dirs are scratch (`.synthesis/` is gitignored;
-  `.synthesis-arc/` is untracked scratch — don't commit it).
+- `.atlas*/` work dirs are scratch (`.atlas/` is gitignored;
+  `.atlas-arc/` is untracked scratch — don't commit it).
 - Cross-model review = Codex (`codex exec`, ChatGPT-authed, no key). "wingman"
   IS Codex.
 
@@ -109,6 +109,6 @@ theme_detect, synthesize), `skill/tests/` (93 tests), `examples/`,
 
 Part of the `workstate` family (hub: `~/Code/AI/workstate-schema/`
 RESUME-INDEX.md + PROJECT-BRIEF.md). Siblings: spec-kit-linear (shipped),
-spec-kit-jira, project-arc (the dogfood target), spec-kit-red-team. synthesis
+spec-kit-jira, project-arc (the dogfood target), spec-kit-red-team. atlas
 is deliberately NOT in the `workstate-*` family (it reads specs directly, not a
-tracker sink) — name stays `spec-kit-synthesis`.
+tracker sink) — name stays `spec-kit-atlas`.

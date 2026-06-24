@@ -9,9 +9,9 @@ Origin: encodes the non-negotiable invariants already governing this project
 Templates reviewed: plan/spec/tasks/checklist templates consistent (generic spec-kit).
 -->
 
-# spec-kit-synthesis Constitution
+# spec-kit-atlas Constitution
 
-The non-negotiable rules that govern this project. Synthesis turns a project's scattered
+The non-negotiable rules that govern this project. Atlas turns a project's scattered
 spec-kit specs (and optionally code + design docs) into ONE faithful, plain-English,
 interactive architecture storybook. These principles protect the only thing that makes
 such a document worth trusting: **faithfulness**.

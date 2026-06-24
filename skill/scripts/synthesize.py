@@ -1,4 +1,4 @@
-"""synthesize.py — the front door for the spec-kit-synthesis pipeline.
+"""synthesize.py — the front door for the spec-kit-atlas pipeline.
 
 One command that drives the DETERMINISTIC stages and makes the in-session
 reasoning boundary explicit. This is not a button that hides an LLM — by design
@@ -12,12 +12,12 @@ the in-session agent's work. This orchestrator runs the code stages around them:
 
 Usage:
     # Stage 0 only — produce the corpus and print the agent's hand-off brief:
-    uv run python skill/scripts/synthesize.py <specs_dir> --work .synthesis \
+    uv run python skill/scripts/synthesize.py <specs_dir> --work .atlas \
         --project-name "<Name>"
 
     # Finish — once the agent has written architecture_model.json +
     # document_model.json into the work dir, verify + render in one step:
-    uv run python skill/scripts/synthesize.py <specs_dir> --work .synthesis \
+    uv run python skill/scripts/synthesize.py <specs_dir> --work .atlas \
         --out architecture.html [--theme theme.json]
 
 The command auto-detects which path to take from what exists in the work dir,
@@ -74,13 +74,13 @@ _COVERAGE_HINT = """
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Drive the spec-kit-synthesis pipeline (deterministic stages).")
+    p = argparse.ArgumentParser(description="Drive the spec-kit-atlas pipeline (deterministic stages).")
     p.add_argument("specs_dir", help="Path to the specs/ directory (NNN-* feature folders).")
     p.add_argument("--code", default=None, help="Optional source tree to merge as a CODE source (enables the coverage view).")
     p.add_argument("--docs", default=None, help="Optional free-form design-doc / ADR tree to merge as a DESIGN_DOC source.")
     p.add_argument("--adr-dir", default=None, help="A repo's ADR directory (e.g. docs/adr); its docs are ingested as kind='adr' (FR-008). Implies a DESIGN_DOC merge even without --docs.")
-    p.add_argument("--work", default=".synthesis", help="Working dir for IR artifacts (default: .synthesis).")
-    p.add_argument("--project-name", default=None, help="Display name for the synthesis.")
+    p.add_argument("--work", default=".atlas", help="Working dir for IR artifacts (default: .atlas).")
+    p.add_argument("--project-name", default=None, help="Display name for the atlas.")
     p.add_argument("--out", default=None, help="Render the storybook here. Requires the agent's IR files to exist.")
     p.add_argument("--theme", default=None, help="Optional theme-token JSON for the renderer.")
     args = p.parse_args(argv)

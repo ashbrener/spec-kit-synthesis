@@ -1,6 +1,6 @@
 """Tests for host-theme detection (theme_detect.py).
 
-Detection is fail-soft and downstream of synthesis: a partial/empty result must
+Detection is fail-soft and downstream of atlas: a partial/empty result must
 always merge cleanly over render.DEFAULT_THEME and stay a flat str->str dict.
 """
 
@@ -244,7 +244,7 @@ def test_out_file_is_render_loadable(tmp_path: Path):
         ":root { --background:#101015; --text:#eee; --primary:#e3743f; }",
         encoding="utf-8",
     )
-    out_path = tmp_path / "synthesis.theme.json"
+    out_path = tmp_path / "atlas.theme.json"
     rc = main([str(proj), "--out", str(out_path)])
     assert rc == 0
 

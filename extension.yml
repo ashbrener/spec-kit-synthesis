@@ -1,8 +1,8 @@
 # =============================================================================
-# spec-kit-synthesis — SpecKit extension manifest
+# spec-kit-atlas — SpecKit extension manifest
 # =============================================================================
 # The installation contract `specify extension add` reads. The CLI validates this
-# file, copies the repo into the consumer's `.specify/extensions/synthesis/`, and
+# file, copies the repo into the consumer's `.specify/extensions/atlas/`, and
 # registers the command surface below.
 #
 # What this extension does: synthesize a project's scattered spec-kit specs (+ code
@@ -12,7 +12,7 @@
 # reasoning engine; deterministic scripts carry parse, the fail-closed verify gate,
 # and render. READ-ONLY on the consumer's sources — it never mutates them.
 #
-# Unlike a lifecycle extension (e.g. arch-governance), synthesis is INVOKED, not
+# Unlike a lifecycle extension (e.g. arch-governance), atlas is INVOKED, not
 # hook-driven: it registers no lifecycle hooks. On a governed workspace, the atlas
 # command auto-scaffolds its workspace manifest from the governance contracts —
 # one command, no hand-authored manifest (spec 005).
@@ -22,15 +22,15 @@ schema_version: "1.0"
 
 extension:
   # Lowercase-kebab id; the directory name under `.specify/extensions/`. Command
-  # names below must start with `speckit.synthesis.`.
-  id: "synthesis"
-  name: "spec-kit-synthesis"
+  # names below must start with `speckit.atlas.`.
+  id: "atlas"
+  name: "spec-kit-atlas"
   version: "0.1.0"
   description: "Synthesize spec-kit specs into faithful, interactive architecture storybooks & doc portals."
   author: "Ash Brener"
-  repository: "https://github.com/ashbrener/spec-kit-synthesis"
+  repository: "https://github.com/ashbrener/spec-kit-atlas"
   license: "MIT"
-  homepage: "https://github.com/ashbrener/spec-kit-synthesis"
+  homepage: "https://github.com/ashbrener/spec-kit-atlas"
 
 requires:
   # The extension uses only stable SpecKit primitives + its own deterministic
@@ -43,13 +43,13 @@ provides:
   # the Markdown body the host agent runs for that command (the skill instructions).
   commands:
     # One repo → one faithful, interactive plain-English architecture storybook.
-    - name: "speckit.synthesis.storybook"
+    - name: "speckit.atlas.storybook"
       file: "commands/storybook.md"
       description: "One repo → one faithful, interactive plain-English architecture storybook (HTML). Every claim drills to its actual rendered source; fail-closed on fabrication."
 
     # A workspace of repos → a documentation portal + verified traceability atlas.
-    - name: "speckit.synthesis.atlas"
-      file: "commands/atlas.md"
+    - name: "speckit.atlas.map"
+      file: "commands/map.md"
       description: "A workspace of repos → ONE melded, capability-organized architecture story (woven across tiers, built/planned-aware) + a hierarchical source index. On a governed workspace it auto-scaffolds: one command, no manifest."
 
 tags:
@@ -57,4 +57,4 @@ tags:
   - "architecture"
   - "storybook"
   - "traceability"
-  - "synthesis"
+  - "atlas"

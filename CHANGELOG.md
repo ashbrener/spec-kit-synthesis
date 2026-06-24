@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **spec-kit-synthesis** are documented here. The format follows
+All notable changes to **spec-kit-atlas** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -8,7 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Reads the governed citation slots** (spec 008) — synthesis now recovers `derived_from`/`cites`
+- **Reads the governed citation slots** (spec 008) — atlas now recovers `derived_from`/`cites`
   edges directly from the declared front-matter slots (vocabulary.json@0.3.0 `citation_slots`,
   ARCH-ADR-000 Amendment 2), instead of only inferring them from shared prose. A build spec that
   declares `derived_from: [docs:002-architecture]` in `spec.md` front-matter now melds with that
@@ -31,7 +31,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed (earlier in this cycle)
 
 - **The multi-repo portal is now ONE melded, capability-organized story** (spec 006), replacing the
-  book-of-books. `speckit.synthesis.atlas` reasons a single document over the merged workspace corpus,
+  book-of-books. `speckit.atlas.map` reasons a single document over the merged workspace corpus,
   organized by **capabilities** (deterministically clustered over the cross-repo link graph — no
   external graph dependency), each woven across tiers: a functional narrative + per-tier technical
   disclosures (backend / frontend), every claim drilling to its owning repo.
@@ -44,16 +44,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] — 2026-06-16
 
-First public release — packaged as a spec-kit extension (`specify extension add synthesis`).
+First public release — packaged as a spec-kit extension (`specify extension add atlas`).
 
 ### Added
 
-- **`speckit.synthesis.storybook`** — one repo → one faithful, interactive, plain-English
+- **`speckit.atlas.storybook`** — one repo → one faithful, interactive, plain-English
   whole-system architecture storybook (a single self-contained HTML file). The in-session agent
   reasons (extract → reconcile → compose); deterministic scripts carry parse, the fail-closed
   faithfulness gate (`verify.py`), and render. Every claim drills to its real source; a claim with
   no source cannot ship.
-- **`speckit.synthesis.atlas`** — a workspace of repos → a documentation portal (a storybook per
+- **`speckit.atlas.map`** — a workspace of repos → a documentation portal (a storybook per
   repo) plus a verified `docs↔specs↔code` traceability atlas. Cross-repo links are fail-closed
   (`verify_links.py`): declared, shared-identifier, or literal-prose evidence only.
 - **Drill-to-source** — every citation chip opens the actual spec/ADR/code content, copied into the
@@ -67,4 +67,4 @@ First public release — packaged as a spec-kit extension (`specify extension ad
   derives the workspace manifest in-memory from the declared signal, and runs the unchanged pipeline.
   Ungoverned workspaces are unchanged (a hand-authored manifest is still required).
 
-[0.1.0]: https://github.com/ashbrener/spec-kit-synthesis/releases/tag/v0.1.0
+[0.1.0]: https://github.com/ashbrener/spec-kit-atlas/releases/tag/v0.1.0

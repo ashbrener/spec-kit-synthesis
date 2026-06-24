@@ -4,7 +4,7 @@
   "title_accent": "Linear Bridge",
   "lede": "Your repository's spec-kit feature folders, mirrored into Linear as living, trackable issues — automatically, one way, and never by hand.",
   "project_name": "speckit-linear",
-  "kicker": ["Architecture Storybook", "Synthesised from spec · code"],
+  "kicker": ["Architecture Storybook", "Atlased from spec · code"],
   "meta": [
     {"label": "Project", "value": "speckit-linear"},
     {"label": "Sources", "value": "spec · code"},
@@ -221,7 +221,7 @@
       "id": "engine",
       "number": 5,
       "strap": "Seeing the shape",
-      "title": "The synthesis engine",
+      "title": "The atlas engine",
       "subtitle": "Adapters feed one source-agnostic core; the core builds bottom-up; positions evolve over time.",
       "blocks": [
         {

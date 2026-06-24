@@ -1,5 +1,5 @@
 ---
-name: speckit.synthesis.atlas
+name: speckit.atlas.map
 description: Synthesize a WORKSPACE of repositories into one interactive documentation portal — a faithful plain-English storybook per repo plus a verified docs↔specs↔code traceability atlas. Use when someone wants the whole-product story across many repos (a docs repo, the spec-kit specs that created it, and the backend/frontend repos that derive the code), drilling backward to specs and forward to code, all hostable as static HTML. NOT a single-repo renderer (that is the storybook command), NOT a dashboard.
 ---
 
@@ -44,8 +44,8 @@ extension root (`$SYN`), then run every script from there:
 
 ```
 # installed as a spec-kit extension (the usual case):
-SYN=.specify/extensions/synthesis
-# …or running inside the synthesis repo itself (development):
+SYN=.specify/extensions/atlas
+# …or running inside the atlas repo itself (development):
 SYN=.
 ```
 
@@ -63,7 +63,7 @@ uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas
 
 Atlas has exactly two filesystem roles, kept distinct:
 
-- **`--work` (the IR dir, default `.synthesis-portal`)** — the per-member build
+- **`--work` (the IR dir, default `.atlas-portal`)** — the per-member build
   cache: one subdir per member origin holding `corpus.json`, `locators.txt`, and
   the agent-written `architecture_model.json` + `document_model.json`, plus the
   workspace-wide `link_graph.json`. Reviewable, re-runnable, git-ignored.
@@ -73,7 +73,7 @@ Atlas has exactly two filesystem roles, kept distinct:
   or open `index.html` directly.
 
 The **epicenter is the manifest's directory**: every member `path` is resolved
-relative to where `synthesis.workspace.json` lives (absolute paths also work). So
+relative to where `atlas.workspace.json` lives (absolute paths also work). So
 the manifest sits at the workspace root and points outward at sibling repos.
 
 ## One command on a governed workspace (auto-scaffold — spec 005)
@@ -94,11 +94,11 @@ On a **governed** workspace you do not author a manifest at all. Invoke with **n
 
 ```
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal            # then re-run with --out site/ after reasoning
+    --from . --work .atlas-portal            # then re-run with --out site/ after reasoning
 ```
 
 No manifest file is written (the derived manifest is carried in-memory); the reader stays read-only on
-the consumer repos. An **operator overlay** is optional: pass a partial `synthesis.workspace.json`
+the consumer repos. An **operator overlay** is optional: pass a partial `atlas.workspace.json`
 alongside `--from` and it overlays presentation (title/description/theme always wins) and may add or
 override members (e.g. enabling a build repo's code). An **ungoverned** workspace (no reachable
 `.spec-arch-domain.yml`) still requires a hand-authored manifest — the reader invents nothing.
@@ -106,7 +106,7 @@ override members (e.g. enabling a build repo's code). An **ungoverned** workspac
 ## The workspace manifest
 
 For an ungoverned workspace (or to override the derived one), author a
-`synthesis.workspace.{json,toml}` describing the members to federate:
+`atlas.workspace.{json,toml}` describing the members to federate:
 
 ```json
 {
@@ -160,7 +160,7 @@ manifest ─[stage 0 adapt: code]→ per-member origin-stamped corpus.json + loc
 
 ```
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal
+    --from . --work .atlas-portal
 ```
 
 This adapts every present member (build-repo **code** included, for build-status), origin-stamps each
@@ -173,8 +173,8 @@ corpus, builds `link_graph.json`, **merges** the corpora, and clusters them into
 Write a SINGLE melded pair over the **merged** corpus (not one per repo):
 
 ```
-.synthesis-portal/architecture_model.json   (reconcile, across all repos)
-.synthesis-portal/document_model.json        (compose: one Section per capability)
+.atlas-portal/architecture_model.json   (reconcile, across all repos)
+.atlas-portal/document_model.json        (compose: one Section per capability)
 ```
 
 Use `clusters.json` as the **section spine**. Each cluster carries a `kind` (spec 007):
@@ -238,7 +238,7 @@ extension, read-only on the consumer repos:
 - **Declared topology** — when the workspace root publishes a `.spec-arch-domain.yml`
   (validated against the vendored schema), it is the **source of truth** for
   structural topology (members/roles/namespaces/locators), graded `declared`. The
-  `synthesis.workspace.json` supplies presentation always and is the topology
+  `atlas.workspace.json` supplies presentation always and is the topology
   fallback when no manifest is present; the manifest wins on overlapping structural
   fields.
 - **Evidence tiers** — every cross-repo fact is graded `declared` (manifest/config)
@@ -254,7 +254,7 @@ Once the melded `architecture_model.json` + `document_model.json` are in the wor
 
 ```
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal --out site/ [--theme theme.json]
+    --from . --work .atlas-portal --out site/ [--theme theme.json]
 ```
 
 It finishes only when the melded pair exists; otherwise it reprints the brief. On finish it runs BOTH

@@ -1,6 +1,6 @@
 """gov_config.py — the governed-repo config reader (spec 004, Foundational).
 
-Synthesis conforms to the architecture-governance contracts **as a documented format**: it
+Atlas conforms to the architecture-governance contracts **as a documented format**: it
 reads two YAML files a governed project may publish, with NO runtime/import dependency on the
 governance extension (pyyaml is a generic parser).
 

@@ -1,5 +1,5 @@
 [project]
-name = "spec-kit-synthesis"
+name = "spec-kit-atlas"
 version = "0.1.0"
 description = "Synthesize a project's scattered spec-kit specs into one faithful, interactive whole-system architecture storybook (HTML)."
 readme = "README.md"

@@ -1,32 +1,32 @@
-# Synthesis — a Spec Kit extension
+# Atlas — a Spec Kit extension
 
 **Turn a project's scattered spec-kit specs into one readable, beautiful, interactive whole-system
 architecture document — accurate, in plain English, with every claim traceable to its source.**
 Where `/speckit.clarify` checks one spec for correctness and `/speckit.analyze` checks consistency,
-synthesis reads *all* of them — overlapping, evolving, sometimes contradictory — and reasons them
+atlas reads *all* of them — overlapping, evolving, sometimes contradictory — and reasons them
 into a single **current-state** architecture storybook, organized by structure, not by spec history.
 A newcomer reads one generated document and understands how the whole system is built. The *book*,
 not the filing cabinet.
 
 - **Version:** 0.1.0
-- **Repository:** <https://github.com/ashbrener/spec-kit-synthesis>
+- **Repository:** <https://github.com/ashbrener/spec-kit-atlas>
 - **License:** MIT
 - **Requires:** Spec Kit ≥ 0.1.0 · [`uv`](https://docs.astral.sh/uv/) · Python ≥ 3.11 (the only deps are `pydantic` + `pyyaml`)
-- **Commands:** `/speckit.synthesis.storybook` (one repo → one storybook) · `/speckit.synthesis.atlas` (a workspace of repos → a documentation portal + verified traceability atlas)
+- **Commands:** `/speckit.atlas.storybook` (one repo → one storybook) · `/speckit.atlas.map` (a workspace of repos → a documentation portal + verified traceability atlas)
 - **Reasoning engine:** the in-session agent — no API key, no subprocess, no model server
 
 > The in-session agent does the reasoning; deterministic Python scripts carry parsing, the
-> **fail-closed faithfulness gate**, and rendering. Synthesis is **read-only** on your sources and
+> **fail-closed faithfulness gate**, and rendering. Atlas is **read-only** on your sources and
 > introduces **no runtime dependency** on any other extension.
 
-## Why synthesis
+## Why atlas
 
 A spec-driven project accretes dozens of small specs over time. No single document ever says "here
 is the whole system." New engineers and technical evaluators can't read 30 fragmented spec folders
 and reconstruct the architecture — and the specs *contradict* each other, because feature 003
 supersedes a decision feature 001 made. Existing tooling can't help here:
 
-| Need | `/speckit.clarify` | `/speckit.analyze` | Synthesis |
+| Need | `/speckit.clarify` | `/speckit.analyze` | Atlas |
 |---|---|---|---|
 | Is one spec internally correct? | ✅ | partial | — |
 | Are the specs mutually consistent? | ❌ | ✅ | — |
@@ -35,7 +35,7 @@ supersedes a decision feature 001 made. Existing tooling can't help here:
 | Where do the specs leave a gap? | partial | partial | ✅ |
 | Is the spec actually **built** (intent vs code)? | ❌ | ❌ | ✅ |
 
-Synthesis is a *reasoning* task — reconciling many sources into one current-state narrative — which
+Atlas is a *reasoning* task — reconciling many sources into one current-state narrative — which
 is why an LLM does it and a template cannot. What keeps it trustworthy is that the model proposes and
 a deterministic, fail-closed gate disposes.
 
@@ -105,31 +105,31 @@ rendered as a beautified, self-contained page under `sources/` (across all relat
 
 ## Install
 
-Synthesis is a **spec-kit extension**, installed with the `specify` CLI into any spec-kit project.
+Atlas is a **spec-kit extension**, installed with the `specify` CLI into any spec-kit project.
 
 ```bash
 # from the spec-kit community catalog (once published):
-specify extension add synthesis
+specify extension add atlas
 
 # …or from this GitHub repo directly:
-specify extension add --from https://github.com/ashbrener/spec-kit-synthesis/archive/refs/tags/v0.1.0.zip
+specify extension add --from https://github.com/ashbrener/spec-kit-atlas/archive/refs/tags/v0.1.0.zip
 
 # …or from a local checkout (dogfood / development):
-specify extension add /path/to/spec-kit-synthesis --dev
+specify extension add /path/to/spec-kit-atlas --dev
 ```
 
-Installing copies the extension into your project's `.specify/extensions/synthesis/` and registers
+Installing copies the extension into your project's `.specify/extensions/atlas/` and registers
 two commands; if your project was initialised with Claude skills, the CLI also generates
-`/speckit.synthesis.storybook` and `/speckit.synthesis.atlas` under `.claude/skills/`. The extension
+`/speckit.atlas.storybook` and `/speckit.atlas.map` under `.claude/skills/`. The extension
 declares **no lifecycle hooks** — it runs only when you invoke it.
 
-> **Add `.specify/extensions/synthesis/` to your project's `.gitignore`.** The vendored extension is
+> **Add `.specify/extensions/atlas/` to your project's `.gitignore`.** The vendored extension is
 > regenerable (re-run `specify extension add`) and a `--dev` copy carries a nested `.git` and `.venv`
 > you do not want to commit.
 
 ## Usage
 
-### One repo → a storybook (`/speckit.synthesis.storybook`)
+### One repo → a storybook (`/speckit.atlas.storybook`)
 
 Invoke the command and point it at your `specs/` (optionally a source tree for the coverage view, and
 design docs/ADRs). The agent reasons the architecture, the gate verifies it, and the renderer emits
@@ -137,18 +137,18 @@ one HTML file. Under the hood it runs the deterministic stages — locate the ex
 run scripts with their deps provided ephemerally (this ignores any stale vendored `.venv`):
 
 ```bash
-SYN=.specify/extensions/synthesis          # or "." when developing inside this repo
+SYN=.specify/extensions/atlas          # or "." when developing inside this repo
 
 # 1. adapt + the agent's hand-off brief (it then reasons the IR, citing only the emitted locators)
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize.py" path/to/specs \
-    --work .synthesis --project-name "My System"
+    --work .atlas --project-name "My System"
 
 # 2. verify + render (add --code path/to/src for the coverage view; --docs / --adr-dir for ADRs)
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize.py" path/to/specs \
-    --work .synthesis --out architecture.html
+    --work .atlas --out architecture.html
 ```
 
-### Many repos → one portal (`/speckit.synthesis.atlas`)
+### Many repos → one portal (`/speckit.atlas.map`)
 
 When the story spans repositories — a docs repo, the spec-kit specs behind it, the backend/frontend
 that implement it — atlas weaves them into **ONE melded, capability-organized story**. Sections are
@@ -175,25 +175,25 @@ flowchart TD
 ```
 
 ```bash
-SYN=.specify/extensions/synthesis
+SYN=.specify/extensions/atlas
 # 1. adapt + merge + cluster → the capability spine + hand-off brief (agent reasons ONE melded story)
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal
+    --from . --work .atlas-portal
 # 2. verify (links + meld) fail-closed + render the single melded page + source index + sources
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal --out site/
+    --from . --work .atlas-portal --out site/
 ```
 
 `site/` is self-contained — `index.html` (the melded story), `catalog.html` (the hierarchical source
 index: repo › feature › artifacts), and `sources/` (drill-to-source). Cross-repo links and every
 claim are **fail-closed**: nothing ships without real, resolving evidence. See
-[`commands/atlas.md`](commands/atlas.md) for the full algorithm.
+[`commands/map.md`](commands/map.md) for the full algorithm.
 
 ### Governed workspaces: one command, no manifest
 
 On a **governed** workspace (one adopting the architecture-governance convention), you don't author a
 manifest at all. Invoke atlas with **no manifest** and a `--from` pointing anywhere inside the
-workspace; synthesis discovers the authority, derives the manifest in-memory, and runs the pipeline:
+workspace; atlas discovers the authority, derives the manifest in-memory, and runs the pipeline:
 
 ```mermaid
 flowchart LR
@@ -209,13 +209,13 @@ flowchart LR
 ```
 
 ```bash
-SYN=.specify/extensions/synthesis
+SYN=.specify/extensions/atlas
 uv run --with pydantic --with pyyaml python "$SYN/skill/scripts/synthesize_atlas.py" \
-    --from . --work .synthesis-portal          # then re-run with --out site/ after reasoning
+    --from . --work .atlas-portal          # then re-run with --out site/ after reasoning
 ```
 
 No manifest file is written (it's carried in-memory; the reader stays read-only on consumer repos). A
-partial `synthesis.workspace.json` passed alongside overlays presentation and may add/override
+partial `atlas.workspace.json` passed alongside overlays presentation and may add/override
 members (e.g. enabling a build repo's code). An **ungoverned** workspace still needs a hand-authored
 manifest — nothing is invented.
 
@@ -238,7 +238,7 @@ In the reference runs, an adversarial cross-model reviewer iterated each generat
 
 ## Configuration
 
-Synthesis needs **no configuration file** — install and invoke. Two optional inputs tune it:
+Atlas needs **no configuration file** — install and invoke. Two optional inputs tune it:
 
 - **Theme (optional).** Match a host project's look: `theme_detect.py` reads a project's CSS custom
   properties / Tailwind tokens into a theme JSON, which you pass via `--theme`. Fail-soft: unknown
@@ -275,8 +275,8 @@ whether a claim rests on a spec, a design doc, an ADR, or the code itself.
 ```
 extension.yml               the spec-kit extension manifest (specify extension add reads this)
 commands/
-  storybook.md              /speckit.synthesis.storybook — one repo → one storybook (the page engine)
-  atlas.md                  /speckit.synthesis.atlas — a workspace → a portal (the SITE layer)
+  storybook.md              /speckit.atlas.storybook — one repo → one storybook (the page engine)
+  map.md                  /speckit.atlas.map — a workspace → a portal (the SITE layer)
 skill/
   scripts/                  shared deterministic engine (both commands call these)
     schema.py               the IR contracts (source-typed provenance, altitudes, coverage, links)
@@ -315,7 +315,7 @@ uv run pytest skill/tests -q
 ### `verify: FAIL — … VIOLATION(S)`
 The gate is doing its job. Each line names the check and the offending claim/block/locator. Common
 causes: a claim cites a `locator` not in the corpus (fix it to a real fragment id from
-`.synthesis/locators.txt`), a prose block with no `claim_ids` (ground it), or an empty callout. Never
+`.atlas/locators.txt`), a prose block with no `claim_ids` (ground it), or an empty callout. Never
 edit the gate to pass — fix the model.
 
 ### `Library not loaded: …libpython…` when running a vendored script
@@ -338,7 +338,7 @@ correct.
 
 ## Contributing
 
-Synthesis is itself a spec-kit project — it self-hosts the workflow and is built through
+Atlas is itself a spec-kit project — it self-hosts the workflow and is built through
 `specify → clarify → plan → tasks → implement` (see `specs/`). To contribute:
 
 1. Branch off `main`; never commit to `main` directly.
@@ -356,14 +356,14 @@ human-facing surface, unidirectional, faithful*:
 
 - **[spec-kit-arch-governance](https://github.com/ashbrener/spec-kit-arch-governance)** — keeps
   specs↔code↔ADRs in sync (born-compliant citation slots + a read-only validator) and owns the shared
-  vocabulary synthesis reads.
+  vocabulary atlas reads.
 - **[spec-kit-linear-sync](https://github.com/ashbrener/spec-kit-linear-sync)** — mirrors specs into
   Linear as trackable issues.
 - **[spec-kit-jira-sync](https://github.com/ashbrener/spec-kit-jira-sync)** — the same bridge for Jira.
 - **[spec-kit-red-team](https://github.com/ashbrener/spec-kit-red-team)** — adversarial review of
   specs before architecture locks in.
 
-Where the trackers *project* spec state into a tool, and governance *enforces* sync, synthesis
+Where the trackers *project* spec state into a tool, and governance *enforces* sync, atlas
 *reverse-engineers* the coherent whole-system story from the scattered sources.
 
 ## License

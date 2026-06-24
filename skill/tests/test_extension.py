@@ -3,7 +3,7 @@
 `extension.yml` is the installation contract `specify extension add` reads. These tests dogfood it
 against the published protocol (spec-kit `extensions/EXTENSION-PUBLISHING-GUIDE.md`): identity and
 command-name patterns, semantic version, referenced files exist, and the required root files are
-present. Synthesis is an INVOKED (not hook-driven) extension, so it declares no lifecycle hooks.
+present. Atlas is an INVOKED (not hook-driven) extension, so it declares no lifecycle hooks.
 """
 
 import re
@@ -47,8 +47,8 @@ def test_command_names_and_files_resolve():
 
 
 def test_no_lifecycle_hooks_declared():
-    # synthesis is invoked, not hook-driven (unlike arch-governance) — it must register no hooks.
-    assert "hooks" not in _manifest(), "synthesis declares no lifecycle hooks"
+    # atlas is invoked, not hook-driven (unlike arch-governance) — it must register no hooks.
+    assert "hooks" not in _manifest(), "atlas declares no lifecycle hooks"
 
 
 def test_required_root_files_present():

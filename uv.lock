@@ -245,7 +245,7 @@ wheels = [
 ]
 
 [[package]]
-name = "spec-kit-synthesis"
+name = "spec-kit-atlas"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

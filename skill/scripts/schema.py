@@ -1,4 +1,4 @@
-"""IR schemas for spec-kit-synthesis — the contracts between phases.
+"""IR schemas for spec-kit-atlas — the contracts between phases.
 
 These Pydantic models are the *only* coupling between the in-session agent
 (which performs the reasoning of phases A–C) and the deterministic scripts
@@ -262,7 +262,7 @@ class BlockType(str, Enum):
 
 
 class CalloutKind(str, Enum):
-    """The three callout types that map to what synthesis must surface (DESIGN §1.6)."""
+    """The three callout types that map to what atlas must surface (DESIGN §1.6)."""
 
     DECISION = "decision"      # a choice
     UNSPECIFIED = "unspecified"  # a gap (fail-closed)
