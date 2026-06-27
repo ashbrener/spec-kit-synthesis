@@ -92,3 +92,21 @@ def test_compose_resolvers_first_non_none_wins():
 
 def test_deterministic():
     assert RS.render_source_pages(CORPUS) == RS.render_source_pages(CORPUS)
+
+
+def test_source_page_header_shows_category_band_and_label():
+    # spec 011 US2: a drilled source page header carries its source-type band + explicit label,
+    # derived from the fragment kind; an unrecognised kind falls back to a neutral default.
+    corpus = _corpus(
+        _frag("001-a/spec.md#x", "# A\n\nx", kind="spec"),
+        _frag("001-a/plan.md#x", "# P\n\nx", kind="plan"),
+        _frag("002-b/ADR-001.md#x", "# D\n\nx", kind="adr"),
+        _frag("003-c/notes.md#x", "# N\n\nx", kind="design-doc"),
+        _frag("004-d/mystery.md#x", "# M\n\nx", kind="weird-kind"),
+    )
+    pages = RS.render_source_pages(corpus)
+    assert "srctype spec" in pages["001-a-spec.md.html"] and "Spec" in pages["001-a-spec.md.html"]
+    assert "srctype plan" in pages["001-a-plan.md.html"] and "Plan" in pages["001-a-plan.md.html"]
+    assert "srctype adr" in pages["002-b-ADR-001.md.html"]
+    assert "srctype narrative" in pages["003-c-notes.md.html"]
+    assert "srctype source" in pages["004-d-mystery.md.html"]   # neutral default, never blank

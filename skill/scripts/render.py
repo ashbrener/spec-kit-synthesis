@@ -73,6 +73,8 @@ DEFAULT_THEME: dict[str, str] = {
     "line": "#cdc4ad",
     "line-dk": "#b3a98d",
     "shadow": "rgba(40,32,16,.16)",
+    "acc-plan": "#3f6661",     # source-type accents (spec 011): muted teal (plan) + plum (research),
+    "acc-research": "#6a4a63", # tuned to the warm register; spec/code/adr/narrative reuse gold/green/red/blue.
     "font-display": "'Fraunces', Georgia, serif",
     "font-body": "'Newsreader', Georgia, serif",
     "font-mono": "'Spline Sans Mono', ui-monospace, Menlo, monospace",
@@ -85,6 +87,27 @@ SOURCE_T = {
     SourceType.DESIGN_DOC: "doc",
     SourceType.ADR: "adr",
 }
+
+# Source-category taxonomy (spec 011): every chip/source-page → one of six categories (+ neutral
+# 'source' default), driving a consistent accent. Colour is ALWAYS paired with this label, never the
+# sole signal. Chips carry no kind, so the category is derived from SourceType + the locator filename.
+_CATEGORY_LABEL = {"spec": "Spec", "plan": "Plan", "adr": "ADR", "research": "Research",
+                   "code": "Code", "narrative": "Narrative", "source": "Source"}
+
+
+def _source_category(ref: SourceType) -> str:
+    """Six-category identity for a citation chip — total (unknown → 'source')."""
+    t = ref.type
+    if t is SourceType.ADR:
+        return "adr"
+    if t is SourceType.CODE:
+        return "code"
+    if t is SourceType.DESIGN_DOC:
+        return "narrative"
+    if t is SourceType.SPEC:
+        base = ref.locator.split("::", 1)[-1].split("#", 1)[0].rsplit("/", 1)[-1].lower()
+        return "plan" if base == "plan.md" else "research" if base == "research.md" else "spec"
+    return "source"
 
 # CalloutKind → design-system note variant. decision=affirmative (green),
 # unspecified=warning (red), evolution=neutral (plain).
@@ -197,6 +220,9 @@ _STATIC_CSS = """
   nav.toc .wrap{ display: flex; gap: 5px; align-items: center; }
   nav.toc .links{ display: flex; gap: 4px; align-items: center; flex: 1; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
   nav.toc .links::-webkit-scrollbar{ display: none; }
+  /* scroll affordance as capabilities grow (spec 011 US3): the link row already scrolls (overflow-x)
+     and collapses to a hamburger on narrow screens; this fades the right edge to signal "more →". */
+  nav.toc .links{ -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); }
   nav.toc a{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: #5b513c; text-decoration: none;
     padding: 6px 10px; border: 1px solid transparent; border-radius: 3px; transition: all .18s; white-space: nowrap; flex: 0 0 auto; }
   nav.toc a:hover, nav.toc a:focus-visible{ color: var(--ink); border-color: var(--line-dk); background: var(--paper-2); outline: none; }
@@ -269,8 +295,11 @@ _STATIC_CSS = """
   .cite-t{ display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; color: #fff; margin-right: 5px; }
   .cite-t.spec{ background: var(--gold); }
   .cite-t.code{ background: var(--green); }
-  .cite-t.doc{ background: var(--blue); }
   .cite-t.adr{ background: var(--red); }
+  .cite-t.narrative{ background: var(--blue); }
+  .cite-t.plan{ background: var(--acc-plan); }
+  .cite-t.research{ background: var(--acc-research); }
+  .cite-t.source{ background: var(--line-dk); }
 
   /* diagram frames */
   figure{ margin: 34px 0; border: 1px solid var(--line-dk); border-radius: 6px; background: #fbf9f2; padding: 8px; box-shadow: 0 4px 20px var(--shadow); overflow: hidden; }
@@ -336,7 +365,8 @@ _STATIC_CSS = """
   footer .reflist{ columns: 2; column-gap: 40px; font-size: .8rem; line-height: 1.55; margin-top: 16px; }
   footer .reflist p{ margin-bottom: 8px; max-width: none; break-inside: avoid; }
   .reftype{ font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #fff; padding: 1px 5px; border-radius: 4px; margin-right: 6px; }
-  .reftype.spec{ background: var(--gold); } .reftype.code{ background: var(--green); } .reftype.doc{ background: var(--blue); }
+  .reftype.spec{ background: var(--gold); } .reftype.code{ background: var(--green); } .reftype.adr{ background: var(--red); }
+  .reftype.narrative{ background: var(--blue); } .reftype.plan{ background: var(--acc-plan); } .reftype.research{ background: var(--acc-research); } .reftype.source{ background: var(--line-dk); }
   .colophon{ width: 100%; border-collapse: collapse; margin-top: 22px; font-family: var(--font-mono); font-size: 11px; background: var(--paper-2); border: 1px solid var(--line-dk); border-radius: 5px; overflow: hidden; }
   .colophon th, .colophon td{ text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.5; }
   .colophon tbody tr:last-child th, .colophon tbody tr:last-child td{ border-bottom: none; }
@@ -423,11 +453,16 @@ _MELD_CSS = """
   .bs-built{ background:#dce8d6; color:#37502f; }
   .bs-partial{ background:#efe3c4; color:#6e5413; }
   .bs-planned{ background:#e7ded0; color:#7a5a2e; }
-  /* planned content reads as not-yet-built: faded, with a left rule. Print/forced-colors safe. */
+  /* build status reads pre-attentively (spec 011): planned faded + muted heading + dashed left rule;
+     partial intermediate (solid rule + warm heading); built full weight. Colour/fade never the sole
+     signal — the .bstatus badge label is always present. Print/forced-colors safe. */
   .planned{ opacity:.62; }
+  section.planned{ border-left:3px dashed var(--line-dk); padding-left:22px; }
+  section.planned > h2{ opacity:1; color:var(--line-dk); }       /* muted heading via colour, not just opacity */
+  section.partial{ border-left:3px solid var(--line); padding-left:22px; }
+  section.partial > h2{ color:var(--gold); }                     /* subtle warm shift — between built and planned */
   details.tier-mod.planned{ opacity:1; }
   details.tier-mod.planned > .body{ opacity:.6; border-left:2px dashed var(--line-dk); padding-left:14px; }
-  section.planned > h2{ opacity:.8; }
   @media print{ .planned, details.tier-mod.planned > .body{ opacity:1 !important; } }
   /* per-tier disclosure label */
   details.tier-mod > summary .mt{ font-family:var(--font-display); }
@@ -951,10 +986,10 @@ def _resolve_ref_href(ref: SourceRef) -> str:
 
 
 def _cite_chip(ref: SourceRef) -> str:
-    t = SOURCE_T.get(ref.type, "doc")
     title = ref.name + (f" · {ref.anchor}" if ref.anchor else "")
     href = _resolve_ref_href(ref) or "#refs"
-    return f'<a class="ref" href="{href}" title="{esc(title)}"><span class="cite-t {t}">{t}</span>{esc(ref.name)}</a>'
+    cat = _source_category(ref)
+    return f'<a class="ref" href="{href}" title="{esc(title)}"><span class="cite-t {cat}">{cat}</span>{esc(ref.name)}</a>'
 
 
 def _render_callout(block: Block) -> str:
@@ -1060,10 +1095,10 @@ def _source_table(refs: list[SourceRef]) -> str:
         kind = (st.artifact_kind if st else r.type.value)
         repo = (st.repo if st else (r.origin or "—"))
         href = _resolve_ref_href(r) or "#refs"
-        t = SOURCE_T.get(r.type, "doc")
+        cat = _source_category(r)
         rows.append(
             f"<tr><td>{esc(title)}</td>"
-            f'<td><span class="cite-t {t}">{esc(kind)}</span></td>'
+            f'<td><span class="cite-t {cat}">{esc(kind)}</span></td>'
             f"<td>{esc(repo)}</td>"
             f'<td><a class="srcgo" href="{href}">view &rarr;</a></td></tr>'
         )
@@ -1091,7 +1126,8 @@ def _status_badge(status: Optional[str]) -> str:
 
 
 def _render_section(section: Section, fig_counter: list[int]) -> str:
-    sclass = f' class="planned"' if section.build_status == "planned" else ""
+    sclass = ({"planned": ' class="planned"', "partial": ' class="partial"'}
+              .get(section.build_status or "", ""))  # built omits the class → byte-identical legacy output
     parts = [f'<section id="{esc(section.id)}"{sclass}>', '<span class="anchor"></span>']
     strap = f" — {esc(section.strap)}" if section.strap else ""
     parts.append(f'<span class="sec-num">{section.number:02d}{strap}</span>')
@@ -1193,7 +1229,7 @@ def _render_nav(sections: list[Section], project: str, catalog_href: Optional[st
 def _render_footer(doc: DocumentModel, project: str) -> str:
     refs = _all_refs(doc)
     refitems = "".join(
-        f'<p id="{_ref_anchor(r)}"><span class="reftype {SOURCE_T.get(r.type, "doc")}">{SOURCE_T.get(r.type, "doc")}</span>'
+        f'<p id="{_ref_anchor(r)}"><span class="reftype {_source_category(r)}">{_source_category(r)}</span>'
         f'{esc(r.name)}{(" · " + esc(r.anchor)) if r.anchor else ""}</p>'
         for r in refs
     )

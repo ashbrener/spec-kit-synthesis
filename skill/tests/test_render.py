@@ -143,7 +143,7 @@ def test_citation_chips_are_source_typed():
     assert 'class="srcline"' in out
     assert 'class="cite-t spec"' in out
     assert 'class="cite-t code"' in out
-    assert 'class="cite-t doc"' in out                  # design_doc source present
+    assert 'class="cite-t narrative"' in out                  # design_doc source present (narrative)
 
 
 def test_references_appendix_and_colophon():
