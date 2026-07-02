@@ -37,6 +37,29 @@ def _safe(file: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", file).strip("-") or "source"
 
 
+# Source-type taxonomy for the drilled source page (spec 011): the fragment `kind` → one of six
+# categories (+ neutral 'source' default). Drives the header band/label/left-rule. Total.
+_PAGE_CAT_LABEL = {"spec": "Spec", "plan": "Plan", "adr": "ADR", "research": "Research",
+                   "code": "Code", "narrative": "Narrative", "source": "Source"}
+
+
+def _page_category(kind: str) -> str:
+    k = (kind or "").lower()
+    if k in ("spec", "tasks", "data-model", "contract"):
+        return "spec"
+    if k == "plan":
+        return "plan"
+    if k == "research":
+        return "research"
+    if k == "adr":
+        return "adr"
+    if k in ("code", "code-symbol"):
+        return "code"
+    if k == "design-doc":
+        return "narrative"
+    return "source"
+
+
 def source_page_name(locator: str) -> str:
     """Filename of the source page that a locator's file renders to."""
     return f"{_safe(_loc_parts(locator)[0])}.html"
@@ -53,7 +76,16 @@ def _group_by_file(corpus: FragmentCorpus) -> "OrderedDict[str, list]":
 
 _SOURCE_CSS = """
   .srcwrap{ max-width: 860px; }
-  .srchead{ padding: 40px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+  .srchead{ padding: 40px 0 8px 18px; border-bottom: 1px solid var(--line); border-left: 4px solid var(--line-dk); margin-bottom: 28px; }
+  /* source-type identity (spec 011): a tinted band + explicit label + a category-tinted left rule.
+     Colour is paired with the label, never the sole signal. */
+  .srchead.spec{ border-left-color: var(--gold); } .srchead.code{ border-left-color: var(--green); }
+  .srchead.adr{ border-left-color: var(--red); } .srchead.narrative{ border-left-color: var(--blue); }
+  .srchead.plan{ border-left-color: var(--acc-plan); } .srchead.research{ border-left-color: var(--acc-research); }
+  .srchead.source{ border-left-color: var(--line-dk); }
+  .srctype{ display: inline-block; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #fff; padding: 2px 9px; border-radius: 4px; margin: 10px 0 0; }
+  .srctype.spec{ background: var(--gold); } .srctype.code{ background: var(--green); } .srctype.adr{ background: var(--red); }
+  .srctype.narrative{ background: var(--blue); } .srctype.plan{ background: var(--acc-plan); } .srctype.research{ background: var(--acc-research); } .srctype.source{ background: var(--line-dk); }
   a.srcback{ font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--gold); text-decoration: none; }
   a.srcback:hover{ text-decoration: underline; }
   h1.srctitle{ font-family: var(--font-mono); font-size: clamp(1.1rem,2.4vw,1.5rem); font-weight: 600; color: var(--ink); margin: 12px 0 0; word-break: break-all; }
@@ -102,6 +134,8 @@ def _page_html(file: str, fragments: list, theme: dict, back_href: str, back_lab
     b64 = base64.b64encode(blob.encode("utf-8")).decode("ascii")
     css = build_css(theme) + _SOURCE_CSS
     kind = fragments[0].kind if fragments else "document"
+    cat = _page_category(kind)
+    cat_label = _PAGE_CAT_LABEL[cat]
     return (
         '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
         '<meta charset="utf-8">\n'
@@ -110,9 +144,10 @@ def _page_html(file: str, fragments: list, theme: dict, back_href: str, back_lab
         '<meta name="theme-color" content="#f4f0e6">\n'
         f"<title>{esc(file)} — {esc(project)}</title>\n<style>{css}</style>\n</head>\n<body>\n"
         '<div class="grain"></div>\n<div class="wrap srcwrap">\n'
-        '<header class="srchead">'
+        f'<header class="srchead {cat}">'
         f'<a class="srcback" href="{esc(back_href)}">&larr; {esc(back_label)}</a>'
         f'<div class="kicker"><span>Source</span><span>{esc(kind)}</span></div>'
+        f'<div class="srctype {cat}">{esc(cat_label)}</div>'
         f'<h1 class="srctitle">{esc(file)}</h1>'
         "</header>\n"
         '<article id="srcbody" class="md"></article>\n'
