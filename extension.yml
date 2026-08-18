@@ -24,7 +24,7 @@ extension:
   # Lowercase-kebab id; the directory name under `.specify/extensions/`. Command
   # names below must start with `speckit.atlas.`.
   id: "atlas"
-  name: "spec-kit-atlas"
+  name: "Atlas"
   version: "0.1.0"
   description: "Synthesize spec-kit specs into faithful, interactive architecture storybooks & doc portals."
   author: "Ash Brener"
